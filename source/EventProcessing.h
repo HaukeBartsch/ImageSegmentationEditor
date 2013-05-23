@@ -21,13 +21,11 @@ class EventProcessing:public QObject
           QKeyEvent *keyEvent = dynamic_cast<QKeyEvent *>(event);
 
           // std::cerr << "You Pressed " << keyEvent->text().toStdString() << "\n";
-          w->myKeyPressEvent(object, keyEvent);
-          return false;
+          return w->myKeyPressEvent(object, keyEvent);
       } else if (event->type() == QEvent::MouseMove) {
           QMouseEvent *mouseEvent = static_cast<QMouseEvent*>(event);
           //fprintf(stderr, "Mouse event received at: %d %d\n", mouseEvent->pos().x(), mouseEvent->pos().y());
-          w->mouseEvent(object, mouseEvent);
-          return false;
+          return w->mouseEvent(object, mouseEvent);
           // statusBar()->showMessage(QString("Mouse move (%1,%2)").arg(mouseEvent->pos().x()).arg(mouseEvent->pos().y()));
       } else if (event->type() == QEvent::MouseButtonPress) {
               QMouseEvent *mouseEvent = static_cast<QMouseEvent*>(event);
@@ -41,9 +39,15 @@ class EventProcessing:public QObject
               w->myMouseReleaseEvent(object, mouseEvent);
               return false;
               // statusBar()->showMessage(QString("Mouse move (%1,%2)").arg(mouseEvent->pos().x()).arg(mouseEvent->pos().y()));
+      } else if (event->type() == QEvent::MouseButtonDblClick) {
+              QMouseEvent *mouseEvent = static_cast<QMouseEvent*>(event);
+              //fprintf(stderr, "Mouse event received at: %d %d\n", mouseEvent->pos().x(), mouseEvent->pos().y());
+              w->myMouseButtonDblClick(object, mouseEvent);
+              return false;
+              // statusBar()->showMessage(QString("Mouse move (%1,%2)").arg(mouseEvent->pos().x()).arg(mouseEvent->pos().y()));
       } else if (event->type() == QEvent::Wheel) {
               QWheelEvent *wheelEvent = static_cast<QWheelEvent*>(event);
-              w->myMouseWheelEvent(object, wheelEvent);
+              return w->myMouseWheelEvent(object, wheelEvent);
       } else {
           // standard event processing
           return QObject::eventFilter(object, event);

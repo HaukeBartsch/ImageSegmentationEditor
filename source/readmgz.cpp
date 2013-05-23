@@ -175,7 +175,7 @@ void ReadMGZ::writeInt4(int value, FILE *fp) {
 }
 
 
-std::vector<ScalarVolume> *ReadMGZ::getVolume() {
+std::vector<ScalarVolume*> *ReadMGZ::getVolume() {
 
     FILE* fp = fopen(filename.toLatin1().constData(),"rb");
 
@@ -265,7 +265,7 @@ std::vector<ScalarVolume> *ReadMGZ::getVolume() {
     fseek(fp, 284, SEEK_SET);
 
     int frames = nframes;
-    std::vector<ScalarVolume> *volumes = new std::vector<ScalarVolume>();
+    std::vector<ScalarVolume*> *volumes = new std::vector<ScalarVolume*>();
     for (int i = 0; i < frames; i++) {
         ScalarVolume *data = new ScalarVolume(dims, ty);
         if (!data) {
@@ -274,10 +274,11 @@ std::vector<ScalarVolume> *ReadMGZ::getVolume() {
         }
         //data->lattice.setBoundingBox(bbox);
         //data->setTransform(mat);
+        data->filename = filename;
 
         QString name = QString("comp%1").arg(i);
         //data->composeLabel(McFilename(filename).basename(), name.getString() );
-        fread(data->dataPtr, (ulong)dims[0]*dims[1]*dims[2], bytesPerComp, fp);
+        fread(data->dataPtr, (size_t)bytesPerComp, (ulong)dims[0]*dims[1]*dims[2], fp);
 
         switch (type) {
         case 0:
@@ -317,11 +318,17 @@ std::vector<ScalarVolume> *ReadMGZ::getVolume() {
           hue = fmod(hue, 1.0);
           QColor color = QColor::fromHslF(hue, saturation, lightness);
 
-          data->materialColors.push_back( color );
+          data->materialColors.push_back( new QColor(color) );
         }
 
         data->computeHist();
-        volumes->push_back(*data);
+        data->currentWindowLevel[0] = data->autoWindowLevel[0];
+        data->currentWindowLevel[1] = data->autoWindowLevel[1];
+        data->voxelsize.resize(3);
+        data->voxelsize[0] = vz[0];
+        data->voxelsize[1] = vz[1];
+        data->voxelsize[2] = vz[2];
+        volumes->push_back(data);
     }
 
     endHeader h2;
@@ -343,8 +350,8 @@ std::vector<ScalarVolume> *ReadMGZ::getVolume() {
     }
     fclose(fp);
     for(unsigned int i = 0; i < volumes->size(); i++) {
-      volumes->at(i).message = tagText;
-      volumes->at(i).loadCmd = QString("read as mgz from %1").arg(filename.toLatin1().constData());
+      volumes->at(i)->message = tagText;
+      volumes->at(i)->loadCmd = QString("read as mgh from %1").arg(filename.toLatin1().constData());
     }
     return volumes;
 }

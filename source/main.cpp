@@ -46,11 +46,23 @@
 
 int main(int argc, char *argv[])
 {
+
+   /* QDir dir(argv[0]);  // e.g. appdir/Contents/MacOS/appname
+    assert(dir.cdUp());
+    assert(dir.cdUp());
+    assert(dir.cd("PlugIns"));  // e.g. appdir/Contents/PlugIns
+    QCoreApplication::setLibraryPaths(QStringList(dir.absolutePath()));
+    printf("after change, libraryPaths=(%s)\n", QCoreApplication::libraryPaths().join(",").toUtf8().data()); */
+
     QApplication app(argc, argv);
+    app.setOrganizationName("Hauke Bartsch");
+    app.setOrganizationDomain("haukebartsch.com");
+    app.setApplicationName("ImageSegmentationEditor");
     //ImageViewer imageViewer;
     //imageViewer.show();
     MainWindow segmentationEditor;
     segmentationEditor.show();
     app.installEventFilter( new EventProcessing( &segmentationEditor ) );
+    // segmentationEditor.LoadImage();
     return app.exec();
 }

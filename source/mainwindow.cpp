@@ -1,75 +1,293 @@
 #include <QPainter>
 #include <QShortcut>
+#include <QDateTime>
+#include <set>
+#include <QJsonDocument>
+#include <QJsonArray>
+#include <QJsonObject>
+#include <QTextStream>
+#include <QtNetwork/QNetworkRequest>
 
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
 #include "readmgz.h"
 
 MainWindow::MainWindow(QWidget *parent) :
-    QMainWindow(parent),
-    ui(new Ui::MainWindow)
+  QMainWindow(parent),
+  ui(new Ui::MainWindow)
 {
-    setWindowTitle(tr("Image Segmentation Editor"));
-    ui->setupUi(this);
+  setWindowTitle(tr("Image Segmentation Editor"));
+  ui->setupUi(this);
 
-    ui->Image1->setBackgroundRole(QPalette::Base);
-    ui->Image1->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Ignored);
-    ui->Image1->setScaledContents(true);
-    ui->Image1->setMouseTracking(true);
+  Image1 = new QLabel;
+  Image1->setBackgroundRole(QPalette::Base);
+  Image1->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Ignored);
+  Image1->setScaledContents(true);
+  Image1->setFocusPolicy(Qt::WheelFocus);
 
-    ui->Image2->setBackgroundRole(QPalette::Base);
-    ui->Image2->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Ignored);
-    ui->Image2->setScaledContents(true);
-    ui->Image2->setMouseTracking(true);
+  Image2 = new QLabel;
+  Image2->setBackgroundRole(QPalette::Base);
+  Image2->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Ignored);
+  Image2->setScaledContents(true);
+  Image2->setFocusPolicy(Qt::WheelFocus);
 
-    ui->Image3->setBackgroundRole(QPalette::Base);
-    ui->Image3->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Ignored);
-    ui->Image3->setScaledContents(true);
-    ui->Image3->setMouseTracking(true);
+  Image3 = new QLabel;
+  Image3->setBackgroundRole(QPalette::Base);
+  Image3->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Ignored);
+  Image3->setScaledContents(true);
+  Image3->setFocusPolicy(Qt::WheelFocus);
 
-    ui->scrollArea_4->setBackgroundRole(QPalette::Dark);
-    ui->scrollArea_2->setBackgroundRole(QPalette::Dark);
-    ui->scrollArea_3->setBackgroundRole(QPalette::Dark);
 
-    ui->treeWidget->setColumnCount(3);
-    QStringList headerText;
-    headerText << tr("Material") << tr("Index") << tr("Color");
-    ui->treeWidget->setHeaderLabels(headerText);
+  ui->scrollArea_4->setWidget(Image1);
+  ui->scrollArea_2->setWidget(Image2);
+  ui->scrollArea_3->setWidget(Image3);
 
-    // setupDefaultMaterials();
+  ui->scrollArea_4->setBackgroundRole(QPalette::Dark);
+  ui->scrollArea_2->setBackgroundRole(QPalette::Dark);
+  ui->scrollArea_3->setBackgroundRole(QPalette::Dark);
 
-    createActions();
+  ui->treeWidget->setColumnCount(3);
+  QStringList headerText;
+  headerText << tr("Material") << tr("#") << tr("Color");
+  ui->treeWidget->setHeaderLabels(headerText);
+  ui->treeWidget->sortByColumn(1, Qt::AscendingOrder);
 
-    vol1 = NULL;
-    lab1 = NULL;
-    windowLevel[0] = 0;
-    windowLevel[1] = 2400;
-    windowLevelOverlay[0] = 0;
-    windowLevelOverlay[1] = 255;
-    mouseIsDown = false;
+  QList<int> sizes;
+  sizes << 500 << 250;
+  ui->splitter_2->setSizes(sizes);
 
-    toolWindowLevel = false;
-    toolSegmentation = false;
+  createActions();
 
-    scaleFactor1  = 1.8;
-    scaleFactor23 = 1.4;
+  vol1 = NULL;
+  lab1 = NULL;
+  windowLevel[0] = 0;
+  windowLevel[1] = 2400;
+  windowLevelOverlay[0] = 0;
+  windowLevelOverlay[1] = 255;
+  mouseIsDown = false;
 
-    qsrand(1234);
+  scaleFactor1  = 4.8;
+  scaleFactor23 = 2.4;
+
+  qsrand(1234);
+  currentTool = None;
+
+  BrushToolRadius = 0;
+  this->setWindowTitle(QString("Image Segmentation Editor"));
+
+  QSettings settings;
+  currentPath = settings.value("files/currentPath", QDir::currentPath()).toString();
+  // currentPath = QDir::currentPath();
+
+  showHighlights = true;
+  nam = new QNetworkAccessManager(this);
+  connect(nam, SIGNAL(finished(QNetworkReply*)),
+              this, SLOT(finishedSlot(QNetworkReply*)));
 }
 
 MainWindow::~MainWindow()
 {
-    delete ui;
+  delete ui;
 }
 
 
-void MainWindow::myKeyPressEvent(QObject *object, QKeyEvent *keyEvent) {
-  if (object != ui->Image1 && object != ui->Image2 && object != ui->Image3 ) {
-    QWidget::keyPressEvent(keyEvent);
-    return;
+bool MainWindow::myKeyPressEvent(QObject *object, QKeyEvent *keyEvent) {
+
+  if (keyEvent->key() == Qt::Key_0 && (object == Image1 ||
+                                       object == Image2 ||
+                                       object == Image3)) {  // reset window level
+    windowLevel[0] = vol1->autoWindowLevel[0];
+    windowLevel[1] = vol1->autoWindowLevel[1];
+    windowLevelOverlay[0] = lab1->autoWindowLevel[0];
+    windowLevelOverlay[1] = lab1->autoWindowLevel[1];
+    vol1->currentWindowLevel[0] = windowLevel[0];
+    vol1->currentWindowLevel[1] = windowLevel[1];
+    lab1->currentWindowLevel[0] = windowLevelOverlay[0];
+    lab1->currentWindowLevel[1] = windowLevelOverlay[1];
+    update();
+    keyEvent->accept();
+    return true;
   }
+  if (keyEvent->key() == Qt::Key_Plus && (object == Image1 ||
+                                          object == Image2 ||
+                                          object == Image3)) {
+    on_toolButton_4_clicked();
+    keyEvent->accept();
+    return true;
+  }
+  if (keyEvent->key() == Qt::Key_Minus && (object == Image1 ||
+                                           object == Image2 ||
+                                           object == Image3)) {
+    on_toolButton_5_clicked();
+    keyEvent->accept();
+    return true;
+  }
+  if (keyEvent->key() == Qt::Key_Space && (object == Image1 ||
+                                           object == Image2 ||
+                                           object == Image3)) {
+    showHighlights = !showHighlights;
+    update();
+    keyEvent->accept();
+    return true;
+  }
+  if (keyEvent->key() == Qt::Key_C && (object == Image1 ||
+                                       object == Image2 ||
+                                       object == Image3)) {
+    on_toolButton_3_clicked();
+    keyEvent->accept();
+    return true;
+  }
+
+  if (object != Image1 && object != Image2 && object != Image3) {
+    QWidget::keyPressEvent(keyEvent);
+    return false;
+  }
+  keyEvent->accept();
+  bool isShift = QApplication::keyboardModifiers() & Qt::ShiftModifier;
+  bool isCtrl  = QApplication::keyboardModifiers() & Qt::ControlModifier;
+
+  if (currentTool == MainWindow::BrushTool && keyEvent->key() == Qt::Key_0 && isShift)
+    BrushToolRadius = 0;
+  if (currentTool == MainWindow::BrushTool && keyEvent->key() == Qt::Key_1 && isShift)
+    BrushToolRadius = 1;
+  if (currentTool == MainWindow::BrushTool && keyEvent->key() == Qt::Key_2 && isShift)
+    BrushToolRadius = 2;
+  if (currentTool == MainWindow::BrushTool && keyEvent->key() == Qt::Key_3 && isShift)
+    BrushToolRadius = 3;
+  if (currentTool == MainWindow::BrushTool && keyEvent->key() == Qt::Key_4 && isShift)
+    BrushToolRadius = 4;
+  if (keyEvent->key() == Qt::Key_1 && !isShift) {
+    if (volumes.size() >= 1) {
+      vol1 = volumes[0];
+      // restore window level
+      windowLevel[0] = vol1->currentWindowLevel[0];
+      windowLevel[1] = vol1->currentWindowLevel[1];
+      update();
+    }
+  }
+  if (keyEvent->key() == Qt::Key_2 && !isShift) {
+    if (volumes.size() >= 2) {
+      vol1 = volumes[1];
+      windowLevel[0] = vol1->currentWindowLevel[0];
+      windowLevel[1] = vol1->currentWindowLevel[1];
+      update();
+    }
+  }
+  if (keyEvent->key() == Qt::Key_3 && !isShift) {
+    if (volumes.size() >= 3) {
+      vol1 = volumes[2];
+      windowLevel[0] = vol1->currentWindowLevel[0];
+      windowLevel[1] = vol1->currentWindowLevel[1];
+      update();
+    }
+  }
+  if (keyEvent->key() == Qt::Key_4 && !isShift) {
+    if (volumes.size() >= 4) {
+      vol1 = volumes[3];
+      windowLevel[0] = vol1->currentWindowLevel[0];
+      windowLevel[1] = vol1->currentWindowLevel[1];
+      update();
+    }
+  }
+  if (keyEvent->key() == Qt::Key_5 && !isShift) {
+    if (volumes.size() >= 5) {
+      vol1 = volumes[4];
+      windowLevel[0] = vol1->currentWindowLevel[0];
+      windowLevel[1] = vol1->currentWindowLevel[1];
+      update();
+    }
+  }
+  if (keyEvent->key() == Qt::Key_6 && !isShift) {
+    if (volumes.size() >= 6) {
+      vol1 = volumes[5];
+      windowLevel[0] = vol1->currentWindowLevel[0];
+      windowLevel[1] = vol1->currentWindowLevel[1];
+      update();
+    }
+  }
+  if (keyEvent->key() == Qt::Key_7 && !isShift) {
+    if (volumes.size() >= 7) {
+      vol1 = volumes[6];
+      windowLevel[0] = vol1->currentWindowLevel[0];
+      windowLevel[1] = vol1->currentWindowLevel[1];
+      update();
+    }
+  }
+  if (keyEvent->key() == Qt::Key_8 && !isShift) {
+    if (volumes.size() >= 8) {
+      vol1 = volumes[7];
+      windowLevel[0] = vol1->currentWindowLevel[0];
+      windowLevel[1] = vol1->currentWindowLevel[1];
+      update();
+    }
+  }
+  if (keyEvent->key() == Qt::Key_9 && !isShift) {
+    if (volumes.size() >= 9) {
+      vol1 = volumes[8];
+      windowLevel[0] = vol1->currentWindowLevel[0];
+      windowLevel[1] = vol1->currentWindowLevel[1];
+      update();
+    }
+  }
+
+  if (keyEvent->key() == Qt::Key_1 && isCtrl) {
+    if (labels.size() >= 1) {
+      lab1 = labels[0];
+      update();
+    }
+  }
+  if (keyEvent->key() == Qt::Key_2 && isCtrl) {
+    if (volumes.size() >= 2) {
+      lab1 = labels[1];
+      update();
+    }
+  }
+  if (keyEvent->key() == Qt::Key_3 && isCtrl) {
+    if (volumes.size() >= 3) {
+      lab1 = labels[2];
+      update();
+    }
+  }
+  if (keyEvent->key() == Qt::Key_4 && isCtrl) {
+    if (volumes.size() >= 4) {
+      lab1 = labels[3];
+      update();
+    }
+  }
+  if (keyEvent->key() == Qt::Key_5 && isCtrl) {
+    if (volumes.size() >= 5) {
+      lab1 = labels[4];
+      update();
+    }
+  }
+  if (keyEvent->key() == Qt::Key_6 && isCtrl) {
+    if (volumes.size() >= 6) {
+      lab1 = labels[5];
+      update();
+    }
+  }
+  if (keyEvent->key() == Qt::Key_7 && isCtrl) {
+    if (volumes.size() >= 7) {
+      lab1 = labels[6];
+      update();
+    }
+  }
+  if (keyEvent->key() == Qt::Key_8 && isCtrl) {
+    if (volumes.size() >= 8) {
+      lab1 = labels[7];
+      update();
+    }
+  }
+  if (keyEvent->key() == Qt::Key_9 && isCtrl) {
+    if (volumes.size() >= 9) {
+      lab1 = labels[8];
+      update();
+    }
+  }
+
+
   //fprintf(stderr, "MainWindow event received at: %d %d\n", keyEvent->pos().x(), mouseEvent->pos().y());
-  if (object == ui->Image1) {
+  if (object == Image1) {
     if (keyEvent->matches(QKeySequence::MoveToPreviousLine) ||
         keyEvent->key() == Qt::Key_Up) {
       slicePosition[2]++;
@@ -80,7 +298,7 @@ void MainWindow::myKeyPressEvent(QObject *object, QKeyEvent *keyEvent) {
     } else if (keyEvent->key() == Qt::Key_F) {
       FillHighlight(0);
     }
-  } else if (object == ui->Image2) {
+  } else if (object == Image2) {
     if (keyEvent->matches(QKeySequence::MoveToPreviousLine) ||
         keyEvent->key() == Qt::Key_Up) {
       slicePosition[1]++;
@@ -91,7 +309,7 @@ void MainWindow::myKeyPressEvent(QObject *object, QKeyEvent *keyEvent) {
     } else if (keyEvent->key() == Qt::Key_F) {
       FillHighlight(1);
     }
-  } else if (object == ui->Image3) {
+  } else if (object == Image3) {
     if (keyEvent->matches(QKeySequence::MoveToPreviousLine) ||
         keyEvent->key() == Qt::Key_Up) {
       slicePosition[0]++;
@@ -103,45 +321,131 @@ void MainWindow::myKeyPressEvent(QObject *object, QKeyEvent *keyEvent) {
       FillHighlight(2);
     }
   }
-  QWidget::keyPressEvent(keyEvent);
-  // extract the intensity at the mouse location and show as text
-
+  return true;
 }
 
 void MainWindow::myMouseReleaseEvent ( QObject *object, QMouseEvent * e ) {
   //fprintf(stderr, "Mouse was released at: %d %d", e->pos().x(), e->pos().y() );
   mouseIsDown = false;
+  if (currentTool == MainWindow::BrushTool)
+    setHighlightBuffer(object, e);
 }
 
 void MainWindow::myMousePressEvent ( QObject *object, QMouseEvent * e ) {
-  if (object != ui->Image1 && object != ui->Image2 && object != ui->Image3 ) {
-      return;
+  if (object != Image1 && object != Image2 && object != Image3 ) {
+    return;
   }
   //fprintf(stderr, "Mouse was pressed at: %d %d", e->pos().x(), e->pos().y() );
   mousePressLocation[0] = e->pos().x();
   mousePressLocation[1] = e->pos().y();
   windowLevelBefore[0]  = windowLevel[0];
   windowLevelBefore[1]  = windowLevel[1];
+  scaleFactor1Before    = scaleFactor1;
+  scaleFactor23Before   = scaleFactor23;
   mouseIsDown = true;
+  int posx = floor( e->pos().x() / scaleFactor1);
+  int posy = floor( e->pos().y() / scaleFactor1);
+
+  if (currentTool == MainWindow::BrushTool)
+    setHighlightBuffer(object, e);
+  if (currentTool == MainWindow::MagicWandTool && object == Image1) {
+    regionGrowing(posx, posy, slicePosition[2]);
+    update();
+  } else if (currentTool == MainWindow::MagicWandTool && object == Image2) {
+    posx = floor( e->pos().x() / scaleFactor23);
+    posy = floor( e->pos().y() / scaleFactor23);
+    regionGrowing2(posx, posy, slicePosition[1]);
+    update();
+  } else if (currentTool == MainWindow::MagicWandTool && object == Image3) {
+    posx = floor( e->pos().x() / scaleFactor23);
+    posy = floor( e->pos().y() / scaleFactor23);
+    regionGrowing3(posx, posy, slicePosition[0]);
+    update();
+  }
 }
 
-void MainWindow::mouseEvent(QObject *object, QMouseEvent *e) {
-  if (object != ui->Image1 && object != ui->Image2 && object != ui->Image3 ) {
+void MainWindow::setHighlightBuffer(QObject *object, QMouseEvent *e) {
+  if (!lab1 || !hbuffer.size())
     return;
+
+  if (hbuffer.size() != (ulong)lab1->size[0]*lab1->size[1]*lab1->size[2])
+    return;
+  // can be several tools create a brush first
+  if (object == Image1) {
+    int posx = floor( e->pos().x() / scaleFactor1);
+    int posy = floor( e->pos().y() / scaleFactor1);
+
+    bool isCtrl = QApplication::keyboardModifiers() & Qt::ControlModifier;
+    int radius = BrushToolRadius;
+    for (int i = posx-radius; i <= posx+radius; i++) {    // 2
+      for (int j = posy-radius; j <= posy+radius; j++) {  // 1
+        hbuffer[slicePosition[2]*(lab1->size[0]*lab1->size[1]) + j*lab1->size[0] + i] = !isCtrl;
+      }
+    }
+    update();
+  } else if (object == Image2) {
+    int posx = floor( e->pos().x() / scaleFactor23);
+    int posy = floor( e->pos().y() / scaleFactor23);
+
+    bool isCtrl = QApplication::keyboardModifiers() & Qt::ControlModifier;
+    int radius = BrushToolRadius;
+    for (int i = posx-radius; i <= posx+radius; i++) {  // 2
+      for (int j = posy-radius; j <= posy+radius; j++) { // 0
+        hbuffer[j*(lab1->size[0]*lab1->size[1]) + slicePosition[1]*lab1->size[0] + i] = !isCtrl;
+      }
+    }
+    update();
+
+  } else if (object == Image3) {
+    int posx = floor( e->pos().x() / scaleFactor23);
+    int posy = floor( e->pos().y() / scaleFactor23);
+
+    bool isCtrl = QApplication::keyboardModifiers() & Qt::ControlModifier;
+    int radius = BrushToolRadius;
+    for (int i = posx-radius; i <= posx+radius; i++) {   //
+      for (int j = posy-radius; j <= posy+radius; j++) { //
+        hbuffer[j*(lab1->size[0]*lab1->size[1]) + i*lab1->size[0] + slicePosition[0]] = !isCtrl;
+      }
+    }
+    update();
   }
+
+
+}
+
+bool MainWindow::mouseEvent(QObject *object, QMouseEvent *e) {
+  if (object != Image1 && object != Image2 && object != Image3 ) {
+    return false;
+  }
+  e->accept();
+
   //fprintf(stderr, "MainWindow event received at: %d %d\n", mouseEvent->pos().x(), mouseEvent->pos().y());
-  if (slicePosition.size() == 3)
+  if (slicePosition.size() == 3) {
+    float x = floor(e->pos().x() / scaleFactor1);
+    float y = floor(e->pos().y() / scaleFactor1);
+    if (object == Image2 || object == Image3) {
+      x = floor(e->pos().x() / scaleFactor23);
+      y = floor(e->pos().y() / scaleFactor23);
+    }
+
     ui->label->setText(QString("x: %1 y: %2 z: %3 (%4,%5)")
                        .arg(slicePosition[0])
         .arg(slicePosition[1])
         .arg(slicePosition[2])
-        .arg( floor( e->pos().x() / scaleFactor1 + 0.5) )
-        .arg( floor( e->pos().y() / scaleFactor23 + 0.5) ));
+        .arg( x )
+        .arg( y ));
+  }
 
+  bool isShift = QApplication::keyboardModifiers() & Qt::ShiftModifier;
   // extract the intensity at the mouse location and show as text
-  if (mouseIsDown && toolWindowLevel) {
-    float distx = (mousePressLocation[0] - e->pos().x());
-    float disty = (mousePressLocation[1] - e->pos().y());
+  if (mouseIsDown && (currentTool == MainWindow::ContrastBrightness ||
+                      isShift)) {
+    float distx = (mousePressLocation[0] - e->pos().x())/scaleFactor1/200.0*(vol1->range[1]-vol1->range[0]);
+    float disty = (mousePressLocation[1] - e->pos().y())/scaleFactor1/200.0*(vol1->range[1]-vol1->range[0]);
+    if (object == Image2 || object == Image3) {
+      distx = (mousePressLocation[0] - e->pos().x())/scaleFactor23/200.0*(vol1->range[1]-vol1->range[0]);
+      disty = (mousePressLocation[1] - e->pos().y())/scaleFactor23/200.0*(vol1->range[1]-vol1->range[0]);
+    }
     //windowLevel[0] = windowLevelBefore[0] + disty;
     //windowLevel[1] = windowLevelBefore[1] + disty;
     float mid  = windowLevelBefore[0] + (windowLevelBefore[1]-windowLevelBefore[0])/2.0;
@@ -153,74 +457,1286 @@ void MainWindow::mouseEvent(QObject *object, QMouseEvent *e) {
       windowLevel[0] = windowLevel[1];
       windowLevel[1] = tmp;
     }
-    fprintf(stderr, "window level change: %f %f", windowLevel[0], windowLevel[1]);
+    // fprintf(stderr, "window level change: %f %f", windowLevel[0], windowLevel[1]);
+    vol1->currentWindowLevel[0] = windowLevel[0];
+    vol1->currentWindowLevel[1] = windowLevel[1];
 
     update();
-  } else if (mouseIsDown && toolSegmentation) {
-    // can be several tools create a brush first
-    if (lab1 && object == ui->Image1) {
-      int posx = floor( e->pos().x() / scaleFactor1 + 0.5);
-      int posy = floor( e->pos().y() / scaleFactor1 + 0.5);
+  } else if (mouseIsDown && currentTool == MainWindow::ZoomTool) {
+    float disty = (mousePressLocation[1] - e->pos().y())/200.0;
+    fprintf(stderr, "zoom changed: %f %f", scaleFactor1, disty);
 
-      bool isCtrl = QApplication::keyboardModifiers() & Qt::ControlModifier;
-      int radius = 1;
-      for (int i = posx-radius; i <= posx+radius; i++) {
-        for (int j = posy-radius; j <= posy+radius; j++) {
-          hbuffer[slicePosition[2]*(lab1->size[0]*lab1->size[1]) + j*lab1->size[0] + i] = !isCtrl;
-        }
-      }
+    // set the factor explicitly
+    scaleFactor1 = scaleFactor1Before+disty;
+    scaleFactor23 = scaleFactor23Before+disty;
+    scaleImage(1);
+
+  } else if (mouseIsDown && currentTool == MainWindow::BrushTool) {
+    if (!lab1)
+      return false;
+    setHighlightBuffer(object, e);
+
+  } else if (mouseIsDown && currentTool == MainWindow::MagicWandTool) {
+    // can be several tools create a brush first
+    if (lab1 && object == Image1) {
+      int posx = floor( e->pos().x() / scaleFactor1);
+      int posy = floor( e->pos().y() / scaleFactor1);
+
+      regionGrowing(posx, posy, slicePosition[2]);
+      update();
+    } else if (lab1 && object == Image2) {
+      int posx = floor( e->pos().x() / scaleFactor23);
+      int posy = floor( e->pos().y() / scaleFactor23);
+
+      regionGrowing2(posx, posy, slicePosition[1]);
+      update();
+
+    } else if (lab1 && object == Image3) {
+      int posx = floor( e->pos().x() / scaleFactor23);
+      int posy = floor( e->pos().y() / scaleFactor23);
+
+      regionGrowing3(posx, posy, slicePosition[0]);
       update();
     }
 
   }
+  return true;
 }
 
-void MainWindow::myMouseWheelEvent (QObject *object, QWheelEvent * e) {
-  if (object != ui->Image1 && object != ui->Image2 && object != ui->Image3 )
+// add region to buffer
+void MainWindow::regionGrowing(int posx, int posy, int slice) {
+  if (!vol1 || posx < 0 || posx > vol1->size[0]-1 ||
+      posy  < 0 || posy  > vol1->size[1]-1 ||
+      slice < 0 || slice > vol1->size[2]-1 ||
+      hbuffer.size() != vol1->size[0]*vol1->size[1]*vol1->size[2])
     return;
+  float fuzzy = 0.2*fabs(windowLevel[1]-windowLevel[0])
+      * 0.2*fabs(windowLevel[1]-windowLevel[0]);
+  ulong offset = (ulong)slice*vol1->size[0]*vol1->size[1];
+  bool isCtrl = QApplication::keyboardModifiers() & Qt::ControlModifier;
+
+  // either the current volume is a scalar or a color field
+  if (vol1->elementLength == 1) {
+
+    boost::dynamic_bitset<ulong> done(vol1->size[0]*vol1->size[1]); // what was found
+    std::vector<ulong> todo; // helper array to keep track what needs to be added
+    switch(vol1->dataType) {
+      case MyPrimType::UCHAR : {
+          unsigned char *d = (unsigned char *)vol1->dataPtr + offset*vol1->elementLength;
+          ulong idx = posy*vol1->size[0]+posx;
+          float start[1];
+          start[0] = d[idx];
+          done.set(idx);
+          todo.push_back(idx);
+          for (ulong i = 0; i < todo.size(); i++) {
+            ulong here = todo.at(i);
+            int y = floor(here/vol1->size[0]);
+            int x = here-(y*vol1->size[0]);
+
+            ulong n1 = (y+1)*vol1->size[0]+ x;
+            ulong n2 = (y-1)*vol1->size[0]+ x;
+            ulong n3 = (y)  *vol1->size[0]+(x+1);
+            ulong n4 = (y)  *vol1->size[0]+(x-1);
+            if (y+1 < vol1->size[1] && !done[n1]) {
+              // check intensities at this location relative to first location
+              float h[1];
+              h[0] = d[n1];
+              if ( (start[0]-h[0]) * (start[0] - h[0]) < fuzzy ) {
+                todo.push_back(n1);
+                done.set(n1);
+              }
+            }
+            if (y-1 > -1 && !done[n2]) {
+              // check intensities at this location relative to first location
+              float h[1];
+              h[0] = d[n2];
+              if ( (start[0]-h[0]) * (start[0] - h[0]) < fuzzy ) {
+                todo.push_back(n2);
+                done.set(n2);
+              }
+            }
+            if (x+1 < vol1->size[0] && !done[n3]) {
+              // check intensities at this location relative to first location
+              float h[1];
+              h[0] = d[n3];
+              if ( (start[0]-h[0]) * (start[0] - h[0]) < fuzzy ) {
+                todo.push_back(n3);
+                done.set(n3);
+              }
+            }
+            if (x-1 > -1 && !done[n4]) {
+              // check intensities at this location relative to first location
+              float h[1];
+              h[0] = d[n4];
+              if ( (start[0]-h[0]) * (start[0] - h[0]) < fuzzy ) {
+                todo.push_back(n4);
+                done.set(n4);
+              }
+            }
+          }
+          break;
+        }
+      case MyPrimType::SHORT : {
+          short *d = (short *)vol1->dataPtr + offset*vol1->elementLength;
+          ulong idx = posy*vol1->size[0]+posx;
+          float start[1];
+          start[0] = d[idx];
+          done.set(idx);
+          todo.push_back(idx);
+          for (ulong i = 0; i < todo.size(); i++) {
+            ulong here = todo.at(i);
+            int y = floor(here/vol1->size[0]);
+            int x = here-(y*vol1->size[0]);
+
+            ulong n1 = (y+1)*vol1->size[0]+ x;
+            ulong n2 = (y-1)*vol1->size[0]+ x;
+            ulong n3 = (y)  *vol1->size[0]+(x+1);
+            ulong n4 = (y)  *vol1->size[0]+(x-1);
+            if (y+1 < vol1->size[1] && !done[n1]) {
+              // check intensities at this location relative to first location
+              float h[1];
+              h[0] = d[n1];
+              if ( (start[0]-h[0]) * (start[0] - h[0]) < fuzzy ) {
+                todo.push_back(n1);
+                done.set(n1);
+              }
+            }
+            if (y-1 > -1 && !done[n2]) {
+              // check intensities at this location relative to first location
+              float h[1];
+              h[0] = d[n2];
+              if ( (start[0]-h[0]) * (start[0] - h[0]) < fuzzy ) {
+                todo.push_back(n2);
+                done.set(n2);
+              }
+            }
+            if (x+1 < vol1->size[0] && !done[n3]) {
+              // check intensities at this location relative to first location
+              float h[1];
+              h[0] = d[n3];
+              if ( (start[0]-h[0]) * (start[0] - h[0]) < fuzzy ) {
+                todo.push_back(n3);
+                done.set(n3);
+              }
+            }
+            if (x-1 > -1 && !done[n4]) {
+              // check intensities at this location relative to first location
+              float h[1];
+              h[0] = d[n4];
+              if ( (start[0]-h[0]) * (start[0] - h[0]) < fuzzy ) {
+                todo.push_back(n4);
+                done.set(n4);
+              }
+            }
+          }
+          break;
+        }
+      case MyPrimType::USHORT : {
+          unsigned short *d = (unsigned short *)vol1->dataPtr + offset*vol1->elementLength;
+          ulong idx = posy*vol1->size[0]+posx;
+          float start[1];
+          start[0] = d[idx];
+          done.set(idx);
+          todo.push_back(idx);
+          for (ulong i = 0; i < todo.size(); i++) {
+            ulong here = todo.at(i);
+            int y = floor(here/vol1->size[0]);
+            int x = here-(y*vol1->size[0]);
+
+            ulong n1 = (y+1)*vol1->size[0]+ x;
+            ulong n2 = (y-1)*vol1->size[0]+ x;
+            ulong n3 = (y)  *vol1->size[0]+(x+1);
+            ulong n4 = (y)  *vol1->size[0]+(x-1);
+            if (y+1 < vol1->size[1] && !done[n1]) {
+              // check intensities at this location relative to first location
+              float h[1];
+              h[0] = d[n1];
+              if ( (start[0]-h[0]) * (start[0] - h[0]) < fuzzy ) {
+                todo.push_back(n1);
+                done.set(n1);
+              }
+            }
+            if (y-1 > -1 && !done[n2]) {
+              // check intensities at this location relative to first location
+              float h[1];
+              h[0] = d[n2];
+              if ( (start[0]-h[0]) * (start[0] - h[0]) < fuzzy ) {
+                todo.push_back(n2);
+                done.set(n2);
+              }
+            }
+            if (x+1 < vol1->size[0] && !done[n3]) {
+              // check intensities at this location relative to first location
+              float h[1];
+              h[0] = d[n3];
+              if ( (start[0]-h[0]) * (start[0] - h[0]) < fuzzy ) {
+                todo.push_back(n3);
+                done.set(n3);
+              }
+            }
+            if (x-1 > -1 && !done[n4]) {
+              // check intensities at this location relative to first location
+              float h[1];
+              h[0] = d[n4];
+              if ( (start[0]-h[0]) * (start[0] - h[0]) < fuzzy ) {
+                todo.push_back(n4);
+                done.set(n4);
+              }
+            }
+          }
+          break;
+        }
+      case MyPrimType::FLOAT : {
+          float *d = (float *)vol1->dataPtr + offset*vol1->elementLength;
+          ulong idx = posy*vol1->size[0]+posx;
+          float start[1];
+          start[0] = d[idx];
+          done.set(idx);
+          todo.push_back(idx);
+          for (ulong i = 0; i < todo.size(); i++) {
+            ulong here = todo.at(i);
+            int y = floor(here/vol1->size[0]);
+            int x = here-(y*vol1->size[0]);
+
+            ulong n1 = (y+1)*vol1->size[0]+ x;
+            ulong n2 = (y-1)*vol1->size[0]+ x;
+            ulong n3 = (y)  *vol1->size[0]+(x+1);
+            ulong n4 = (y)  *vol1->size[0]+(x-1);
+            if (y+1 < vol1->size[1] && !done[n1]) {
+              // check intensities at this location relative to first location
+              float h[1];
+              h[0] = d[n1];
+              if ( (start[0]-h[0]) * (start[0] - h[0]) < fuzzy ) {
+                todo.push_back(n1);
+                done.set(n1);
+              }
+            }
+            if (y-1 > -1 && !done[n2]) {
+              // check intensities at this location relative to first location
+              float h[1];
+              h[0] = d[n2];
+              if ( (start[0]-h[0]) * (start[0] - h[0]) < fuzzy ) {
+                todo.push_back(n2);
+                done.set(n2);
+              }
+            }
+            if (x+1 < vol1->size[0] && !done[n3]) {
+              // check intensities at this location relative to first location
+              float h[1];
+              h[0] = d[n3];
+              if ( (start[0]-h[0]) * (start[0] - h[0]) < fuzzy ) {
+                todo.push_back(n3);
+                done.set(n3);
+              }
+            }
+            if (x-1 > -1 && !done[n4]) {
+              // check intensities at this location relative to first location
+              float h[1];
+              h[0] = d[n4];
+              if ( (start[0]-h[0]) * (start[0] - h[0]) < fuzzy ) {
+                todo.push_back(n4);
+                done.set(n4);
+              }
+            }
+          }
+          break;
+        }
+      case MyPrimType::INT : {
+          signed int *d = (signed int *)vol1->dataPtr + offset*vol1->elementLength;
+          ulong idx = posy*vol1->size[0]+posx;
+          float start[1];
+          start[0] = d[idx];
+          done.set(idx);
+          todo.push_back(idx);
+          for (ulong i = 0; i < todo.size(); i++) {
+            ulong here = todo.at(i);
+            int y = floor(here/vol1->size[0]);
+            int x = here-(y*vol1->size[0]);
+
+            ulong n1 = (y+1)*vol1->size[0]+ x;
+            ulong n2 = (y-1)*vol1->size[0]+ x;
+            ulong n3 = (y)  *vol1->size[0]+(x+1);
+            ulong n4 = (y)  *vol1->size[0]+(x-1);
+            if (y+1 < vol1->size[1] && !done[n1]) {
+              // check intensities at this location relative to first location
+              float h[1];
+              h[0] = d[n1];
+              if ( (start[0]-h[0]) * (start[0] - h[0]) < fuzzy ) {
+                todo.push_back(n1);
+                done.set(n1);
+              }
+            }
+            if (y-1 > -1 && !done[n2]) {
+              // check intensities at this location relative to first location
+              float h[1];
+              h[0] = d[n2];
+              if ( (start[0]-h[0]) * (start[0] - h[0]) < fuzzy ) {
+                todo.push_back(n2);
+                done.set(n2);
+              }
+            }
+            if (x+1 < vol1->size[0] && !done[n3]) {
+              // check intensities at this location relative to first location
+              float h[1];
+              h[0] = d[n3];
+              if ( (start[0]-h[0]) * (start[0] - h[0]) < fuzzy ) {
+                todo.push_back(n3);
+                done.set(n3);
+              }
+            }
+            if (x-1 > -1 && !done[n4]) {
+              // check intensities at this location relative to first location
+              float h[1];
+              h[0] = d[n4];
+              if ( (start[0]-h[0]) * (start[0] - h[0]) < fuzzy ) {
+                todo.push_back(n4);
+                done.set(n4);
+              }
+            }
+          }
+          break;
+        }
+      case MyPrimType::UINT : {
+          unsigned int *d = (unsigned int *)vol1->dataPtr + offset*vol1->elementLength;
+          ulong idx = posy*vol1->size[0]+posx;
+          float start[1];
+          start[0] = d[idx];
+          done.set(idx);
+          todo.push_back(idx);
+          for (ulong i = 0; i < todo.size(); i++) {
+            ulong here = todo.at(i);
+            int y = floor(here/vol1->size[0]);
+            int x = here-(y*vol1->size[0]);
+
+            ulong n1 = (y+1)*vol1->size[0]+ x;
+            ulong n2 = (y-1)*vol1->size[0]+ x;
+            ulong n3 = (y)  *vol1->size[0]+(x+1);
+            ulong n4 = (y)  *vol1->size[0]+(x-1);
+            if (y+1 < vol1->size[1] && !done[n1]) {
+              // check intensities at this location relative to first location
+              float h[1];
+              h[0] = d[n1];
+              if ( (start[0]-h[0]) * (start[0] - h[0]) < fuzzy ) {
+                todo.push_back(n1);
+                done.set(n1);
+              }
+            }
+            if (y-1 > -1 && !done[n2]) {
+              // check intensities at this location relative to first location
+              float h[1];
+              h[0] = d[n2];
+              if ( (start[0]-h[0]) * (start[0] - h[0]) < fuzzy ) {
+                todo.push_back(n2);
+                done.set(n2);
+              }
+            }
+            if (x+1 < vol1->size[0] && !done[n3]) {
+              // check intensities at this location relative to first location
+              float h[1];
+              h[0] = d[n3];
+              if ( (start[0]-h[0]) * (start[0] - h[0]) < fuzzy ) {
+                todo.push_back(n3);
+                done.set(n3);
+              }
+            }
+            if (x-1 > -1 && !done[n4]) {
+              // check intensities at this location relative to first location
+              float h[1];
+              h[0] = d[n4];
+              if ( (start[0]-h[0]) * (start[0] - h[0]) < fuzzy ) {
+                todo.push_back(n4);
+                done.set(n4);
+              }
+            }
+          }
+          break;
+        }
+      default: {
+          fprintf(stderr, "Error: this data type is not supported for this operation");
+        }
+    }
+    // now copy everything in done into the hbuffer
+    for (ulong i = 0; i < done.size(); i++) {
+      if (done[i])
+        hbuffer[offset+i] = !isCtrl;
+    }
+
+  } else if (vol1->elementLength == 4) {
+    boost::dynamic_bitset<ulong> done(vol1->size[0]*vol1->size[1]); // what was found
+    std::vector<ulong> todo; // helper array to keep track what needs to be added
+    switch(vol1->dataType) {
+      case MyPrimType::UCHAR :
+        unsigned char *d = (unsigned char *)vol1->dataPtr + offset*vol1->elementLength;
+        ulong idx = posy*vol1->size[0]+posx;
+        float start[3];
+        start[0] = d[4*idx+0];
+        start[1] = d[4*idx+1];
+        start[2] = d[4*idx+2];
+        done.set(idx);
+        todo.push_back(idx);
+        for (ulong i = 0; i < todo.size(); i++) {
+          ulong here = todo.at(i);
+          int y = floor(here/vol1->size[0]);
+          int x = here-(y*vol1->size[0]);
+
+          ulong n1 = (y+1)*vol1->size[0]+ x;
+          ulong n2 = (y-1)*vol1->size[0]+ x;
+          ulong n3 = (y)  *vol1->size[0]+(x+1);
+          ulong n4 = (y)  *vol1->size[0]+(x-1);
+          if (y+1 < vol1->size[1] && !done[n1]) {
+            // check intensities at this location relative to first location
+            float h[3];
+            h[0] = d[4*n1+0];
+            h[1] = d[4*n1+1];
+            h[2] = d[4*n1+2];
+            if ( (start[0]-h[0]) * (start[0] - h[0]) +
+                 (start[1]-h[1]) * (start[1] - h[1]) +
+                 (start[2]-h[2]) * (start[2] - h[2]) < fuzzy ) {
+              todo.push_back(n1);
+              done.set(n1);
+            }
+          }
+          if (y-1 > -1 && !done[n2]) {
+            // check intensities at this location relative to first location
+            float h[3];
+            h[0] = d[4*n2+0];
+            h[1] = d[4*n2+1];
+            h[2] = d[4*n2+2];
+            if ( (start[0]-h[0]) * (start[0] - h[0]) +
+                 (start[1]-h[1]) * (start[1] - h[1]) +
+                 (start[2]-h[2]) * (start[2] - h[2]) < fuzzy ) {
+              todo.push_back(n2);
+              done.set(n2);
+            }
+          }
+          if (x+1 < vol1->size[0] && !done[n3]) {
+            // check intensities at this location relative to first location
+            float h[3];
+            h[0] = d[4*n3+0];
+            h[1] = d[4*n3+1];
+            h[2] = d[4*n3+2];
+            if ( (start[0]-h[0]) * (start[0] - h[0]) +
+                 (start[1]-h[1]) * (start[1] - h[1]) +
+                 (start[2]-h[2]) * (start[2] - h[2]) < fuzzy ) {
+              todo.push_back(n3);
+              done.set(n3);
+            }
+          }
+          if (x-1 > -1 && !done[n4]) {
+            // check intensities at this location relative to first location
+            float h[3];
+            h[0] = d[4*n4+0];
+            h[1] = d[4*n4+1];
+            h[2] = d[4*n4+2];
+            if ( (start[0]-h[0]) * (start[0] - h[0]) +
+                 (start[1]-h[1]) * (start[1] - h[1]) +
+                 (start[2]-h[2]) * (start[2] - h[2]) < fuzzy ) {
+              todo.push_back(n4);
+              done.set(n4);
+            }
+          }
+        }
+        break;
+    }
+    // now copy everything in done into the hbuffer
+    for (ulong i = 0; i < done.size(); i++) {
+      if (done[i])
+        hbuffer[offset+i] = !isCtrl;
+    }
+  } else {
+    fprintf(stderr, "unknown element length for volume 1");
+  }
+}
+
+// add region to buffer
+void MainWindow::regionGrowing2(int posx, int posy, int slice) {  // slice is in direction y
+  if (!vol1 || posx < 0 || posx > vol1->size[0]-1 ||
+      posy  < 0 || posy  > vol1->size[2]-1 ||
+      slice < 0 || slice > vol1->size[1]-1 ||
+      hbuffer.size() != vol1->size[0]*vol1->size[1]*vol1->size[2])
+    return;
+  float fuzzy = 0.2*fabs(windowLevel[1]-windowLevel[0])
+      * 0.2*fabs(windowLevel[1]-windowLevel[0]);
+  bool isCtrl = QApplication::keyboardModifiers() & Qt::ControlModifier;
+
+  // either the current volume is a scalar or a color field
+  if (vol1->elementLength == 1) {
+
+    boost::dynamic_bitset<ulong> done(vol1->size[0]*vol1->size[2]); // what was found
+    std::vector<ulong> todo; // helper array to keep track what needs to be added
+    switch(vol1->dataType) {
+      case MyPrimType::UCHAR : {
+          unsigned char *d = (unsigned char *)vol1->dataPtr;
+          ulong idx = posy*vol1->size[0]*vol1->size[1]+slice*vol1->size[0]+posx;
+          float start[1];
+          start[0] = d[idx];
+          done.set(idx);
+          todo.push_back(idx);
+          for (ulong i = 0; i < todo.size(); i++) {
+            ulong here = todo.at(i);
+            int y  = floor(here/(vol1->size[0]*vol1->size[1]));
+            int s  = floor((here-(y*vol1->size[0]*vol1->size[1]))/vol1->size[0]);
+            int x  = here - (y*vol1->size[0]*vol1->size[1] + s * vol1->size[0]);
+
+            ulong n1 = (y+1)*vol1->size[0]*vol1->size[1]+slice*vol1->size[0]+x;
+            ulong n2 = (y-1)*vol1->size[0]*vol1->size[1]+slice*vol1->size[0]+x;
+            ulong n3 = (y)  *vol1->size[0]*vol1->size[1]+slice*vol1->size[0]+(x+1);
+            ulong n4 = (y)  *vol1->size[0]*vol1->size[1]+slice*vol1->size[0]+(x-1);
+            if (y+1 < vol1->size[2] && !done[n1]) {
+              // check intensities at this location relative to first location
+              float h[1];
+              h[0] = d[n1];
+              if ( (start[0]-h[0]) * (start[0] - h[0]) < fuzzy ) {
+                todo.push_back(n1);
+                done.set(n1);
+              }
+            }
+            if (y-1 > -1 && !done[n2]) {
+              // check intensities at this location relative to first location
+              float h[1];
+              h[0] = d[n2];
+              if ( (start[0]-h[0]) * (start[0] - h[0]) < fuzzy ) {
+                todo.push_back(n2);
+                done.set(n2);
+              }
+            }
+            if (x+1 < vol1->size[0] && !done[n3]) {
+              // check intensities at this location relative to first location
+              float h[1];
+              h[0] = d[n3];
+              if ( (start[0]-h[0]) * (start[0] - h[0]) < fuzzy ) {
+                todo.push_back(n3);
+                done.set(n3);
+              }
+            }
+            if (x-1 > -1 && !done[n4]) {
+              // check intensities at this location relative to first location
+              float h[1];
+              h[0] = d[n4];
+              if ( (start[0]-h[0]) * (start[0] - h[0]) < fuzzy ) {
+                todo.push_back(n4);
+                done.set(n4);
+              }
+            }
+          }
+          break;
+        }
+      case MyPrimType::FLOAT : {
+          float *d = (float *)vol1->dataPtr;
+          ulong idx = posy*vol1->size[0]*vol1->size[1]+slice*vol1->size[0]+posx;
+          float start[1];
+          start[0] = d[idx];
+          done.set(idx);
+          todo.push_back(idx);
+          for (ulong i = 0; i < todo.size(); i++) {
+            ulong here = todo.at(i);
+            int y  = floor(here/(vol1->size[0]*vol1->size[1]));
+            int s  = floor((here-(y*vol1->size[0]*vol1->size[1]))/vol1->size[0]);
+            int x  = here - (y*vol1->size[0]*vol1->size[1] + s * vol1->size[0]);
+
+            ulong n1 = (y+1)*vol1->size[0]*vol1->size[1]+slice*vol1->size[0]+x;
+            ulong n2 = (y-1)*vol1->size[0]*vol1->size[1]+slice*vol1->size[0]+x;
+            ulong n3 = (y)  *vol1->size[0]*vol1->size[1]+slice*vol1->size[0]+(x+1);
+            ulong n4 = (y)  *vol1->size[0]*vol1->size[1]+slice*vol1->size[0]+(x-1);
+            if (y+1 < vol1->size[2] && !done[n1]) {
+              // check intensities at this location relative to first location
+              float h[1];
+              h[0] = d[n1];
+              if ( (start[0]-h[0]) * (start[0] - h[0]) < fuzzy ) {
+                todo.push_back(n1);
+                done.set(n1);
+              }
+            }
+            if (y-1 > -1 && !done[n2]) {
+              // check intensities at this location relative to first location
+              float h[1];
+              h[0] = d[n2];
+              if ( (start[0]-h[0]) * (start[0] - h[0]) < fuzzy ) {
+                todo.push_back(n2);
+                done.set(n2);
+              }
+            }
+            if (x+1 < vol1->size[0] && !done[n3]) {
+              // check intensities at this location relative to first location
+              float h[1];
+              h[0] = d[n3];
+              if ( (start[0]-h[0]) * (start[0] - h[0]) < fuzzy ) {
+                todo.push_back(n3);
+                done.set(n3);
+              }
+            }
+            if (x-1 > -1 && !done[n4]) {
+              // check intensities at this location relative to first location
+              float h[1];
+              h[0] = d[n4];
+              if ( (start[0]-h[0]) * (start[0] - h[0]) < fuzzy ) {
+                todo.push_back(n4);
+                done.set(n4);
+              }
+            }
+          }
+          break;
+        }
+      case MyPrimType::SHORT : {
+          short *d = (short *)vol1->dataPtr;
+          ulong idx = posy*vol1->size[0]*vol1->size[1]+slice*vol1->size[0]+posx;
+          float start[1];
+          start[0] = d[idx];
+          done.set(idx);
+          todo.push_back(idx);
+          for (ulong i = 0; i < todo.size(); i++) {
+            ulong here = todo.at(i);
+            int y  = floor(here/(vol1->size[0]*vol1->size[1]));
+            int s  = floor((here-(y*vol1->size[0]*vol1->size[1]))/vol1->size[0]);
+            int x  = here - (y*vol1->size[0]*vol1->size[1] + s * vol1->size[0]);
+
+            ulong n1 = (y+1)*vol1->size[0]*vol1->size[1]+slice*vol1->size[0]+x;
+            ulong n2 = (y-1)*vol1->size[0]*vol1->size[1]+slice*vol1->size[0]+x;
+            ulong n3 = (y)  *vol1->size[0]*vol1->size[1]+slice*vol1->size[0]+(x+1);
+            ulong n4 = (y)  *vol1->size[0]*vol1->size[1]+slice*vol1->size[0]+(x-1);
+            if (y+1 < vol1->size[2] && !done[n1]) {
+              // check intensities at this location relative to first location
+              float h[1];
+              h[0] = d[n1];
+              if ( (start[0]-h[0]) * (start[0] - h[0]) < fuzzy ) {
+                todo.push_back(n1);
+                done.set(n1);
+              }
+            }
+            if (y-1 > -1 && !done[n2]) {
+              // check intensities at this location relative to first location
+              float h[1];
+              h[0] = d[n2];
+              if ( (start[0]-h[0]) * (start[0] - h[0]) < fuzzy ) {
+                todo.push_back(n2);
+                done.set(n2);
+              }
+            }
+            if (x+1 < vol1->size[0] && !done[n3]) {
+              // check intensities at this location relative to first location
+              float h[1];
+              h[0] = d[n3];
+              if ( (start[0]-h[0]) * (start[0] - h[0]) < fuzzy ) {
+                todo.push_back(n3);
+                done.set(n3);
+              }
+            }
+            if (x-1 > -1 && !done[n4]) {
+              // check intensities at this location relative to first location
+              float h[1];
+              h[0] = d[n4];
+              if ( (start[0]-h[0]) * (start[0] - h[0]) < fuzzy ) {
+                todo.push_back(n4);
+                done.set(n4);
+              }
+            }
+          }
+          break;
+        }
+      default: {
+          fprintf(stderr, "Error: this data type is not supported for this operation");
+        }
+    }
+    // now copy everything in done into the hbuffer
+    for (ulong i = 0; i < done.size(); i++) {
+      if (done[i])
+        hbuffer[i] = !isCtrl;
+    }
+  } else if (vol1->elementLength == 4) {
+    boost::dynamic_bitset<ulong> done(vol1->size[0]*vol1->size[1]*vol1->size[2]); // what was found
+    std::vector<ulong> todo; // helper array to keep track what needs to be added
+    switch(vol1->dataType) {
+      case MyPrimType::UCHAR : {
+          unsigned char *d = (unsigned char *)vol1->dataPtr;
+          ulong idx = posy*vol1->size[0]*vol1->size[1]+slice*vol1->size[0]+posx;
+
+          float start[3];
+          start[0] = d[4*idx+0];
+          start[1] = d[4*idx+1];
+          start[2] = d[4*idx+2];
+          done.set(idx);
+          todo.push_back(idx);
+          for (ulong i = 0; i < todo.size(); i++) {
+            ulong here = todo.at(i);
+            int y  = floor(here/(vol1->size[0]*vol1->size[1]));
+            int s  = floor((here-(y*vol1->size[0]*vol1->size[1]))/vol1->size[0]);
+            int x  = here - (y*vol1->size[0]*vol1->size[1] + s * vol1->size[0]);
+
+            ulong n1 = (y+1)*vol1->size[0]*vol1->size[1]+slice*vol1->size[0]+x;
+            ulong n2 = (y-1)*vol1->size[0]*vol1->size[1]+slice*vol1->size[0]+x;
+            ulong n3 = (y)  *vol1->size[0]*vol1->size[1]+slice*vol1->size[0]+(x+1);
+            ulong n4 = (y)  *vol1->size[0]*vol1->size[1]+slice*vol1->size[0]+(x-1);
+            if (y+1 < vol1->size[2] && !done[n1]) {
+              // check intensities at this location relative to first location
+              float h[3];
+              h[0] = d[4*n1+0];
+              h[1] = d[4*n1+1];
+              h[2] = d[4*n1+2];
+              if ( (start[0]-h[0]) * (start[0] - h[0]) +
+                   (start[1]-h[1]) * (start[1] - h[1]) +
+                   (start[2]-h[2]) * (start[2] - h[2]) < fuzzy ) {
+                todo.push_back(n1);
+                done.set(n1);
+              }
+            }
+            if (y-1 > -1 && !done[n2]) {
+              // check intensities at this location relative to first location
+              float h[3];
+              h[0] = d[4*n2+0];
+              h[1] = d[4*n2+1];
+              h[2] = d[4*n2+2];
+              if ( (start[0]-h[0]) * (start[0] - h[0]) +
+                   (start[1]-h[1]) * (start[1] - h[1]) +
+                   (start[2]-h[2]) * (start[2] - h[2]) < fuzzy ) {
+                todo.push_back(n2);
+                done.set(n2);
+              }
+            }
+            if (x+1 < vol1->size[0] && !done[n3]) {
+              // check intensities at this location relative to first location
+              float h[3];
+              h[0] = d[4*n3+0];
+              h[1] = d[4*n3+1];
+              h[2] = d[4*n3+2];
+              if ( (start[0]-h[0]) * (start[0] - h[0]) +
+                   (start[1]-h[1]) * (start[1] - h[1]) +
+                   (start[2]-h[2]) * (start[2] - h[2]) < fuzzy ) {
+                todo.push_back(n3);
+                done.set(n3);
+              }
+            }
+            if (x-1 > -1 && !done[n4]) {
+              // check intensities at this location relative to first location
+              float h[3];
+              h[0] = d[4*n4+0];
+              h[1] = d[4*n4+1];
+              h[2] = d[4*n4+2];
+              if ( (start[0]-h[0]) * (start[0] - h[0]) +
+                   (start[1]-h[1]) * (start[1] - h[1]) +
+                   (start[2]-h[2]) * (start[2] - h[2]) < fuzzy ) {
+                todo.push_back(n4);
+                done.set(n4);
+              }
+            }
+          }
+        }
+        break;
+      case MyPrimType::FLOAT : {
+          float *d = (float *)vol1->dataPtr;
+          ulong idx = posy*vol1->size[0]*vol1->size[1]+slice*vol1->size[0]+posx;
+
+          float start[3];
+          start[0] = d[4*idx+0];
+          start[1] = d[4*idx+1];
+          start[2] = d[4*idx+2];
+          done.set(idx);
+          todo.push_back(idx);
+          for (ulong i = 0; i < todo.size(); i++) {
+            ulong here = todo.at(i);
+            int y  = floor(here/(vol1->size[0]*vol1->size[1]));
+            int s  = floor((here-(y*vol1->size[0]*vol1->size[1]))/vol1->size[0]);
+            int x  = here - (y*vol1->size[0]*vol1->size[1] + s * vol1->size[0]);
+
+            ulong n1 = (y+1)*vol1->size[0]*vol1->size[1]+slice*vol1->size[0]+x;
+            ulong n2 = (y-1)*vol1->size[0]*vol1->size[1]+slice*vol1->size[0]+x;
+            ulong n3 = (y)  *vol1->size[0]*vol1->size[1]+slice*vol1->size[0]+(x+1);
+            ulong n4 = (y)  *vol1->size[0]*vol1->size[1]+slice*vol1->size[0]+(x-1);
+            if (y+1 < vol1->size[2] && !done[n1]) {
+              // check intensities at this location relative to first location
+              float h[3];
+              h[0] = d[4*n1+0];
+              h[1] = d[4*n1+1];
+              h[2] = d[4*n1+2];
+              if ( (start[0]-h[0]) * (start[0] - h[0]) +
+                   (start[1]-h[1]) * (start[1] - h[1]) +
+                   (start[2]-h[2]) * (start[2] - h[2]) < fuzzy ) {
+                todo.push_back(n1);
+                done.set(n1);
+              }
+            }
+            if (y-1 > -1 && !done[n2]) {
+              // check intensities at this location relative to first location
+              float h[3];
+              h[0] = d[4*n2+0];
+              h[1] = d[4*n2+1];
+              h[2] = d[4*n2+2];
+              if ( (start[0]-h[0]) * (start[0] - h[0]) +
+                   (start[1]-h[1]) * (start[1] - h[1]) +
+                   (start[2]-h[2]) * (start[2] - h[2]) < fuzzy ) {
+                todo.push_back(n2);
+                done.set(n2);
+              }
+            }
+            if (x+1 < vol1->size[0] && !done[n3]) {
+              // check intensities at this location relative to first location
+              float h[3];
+              h[0] = d[4*n3+0];
+              h[1] = d[4*n3+1];
+              h[2] = d[4*n3+2];
+              if ( (start[0]-h[0]) * (start[0] - h[0]) +
+                   (start[1]-h[1]) * (start[1] - h[1]) +
+                   (start[2]-h[2]) * (start[2] - h[2]) < fuzzy ) {
+                todo.push_back(n3);
+                done.set(n3);
+              }
+            }
+            if (x-1 > -1 && !done[n4]) {
+              // check intensities at this location relative to first location
+              float h[3];
+              h[0] = d[4*n4+0];
+              h[1] = d[4*n4+1];
+              h[2] = d[4*n4+2];
+              if ( (start[0]-h[0]) * (start[0] - h[0]) +
+                   (start[1]-h[1]) * (start[1] - h[1]) +
+                   (start[2]-h[2]) * (start[2] - h[2]) < fuzzy ) {
+                todo.push_back(n4);
+                done.set(n4);
+              }
+            }
+          }
+          break;
+        }
+    }
+    // now copy everything in done into the hbuffer
+    for (ulong i = 0; i < done.size(); i++) {
+      if (done[i])
+        hbuffer[i] = !isCtrl;
+    }
+  } else {
+    fprintf(stderr, "unknown element length for volume 1");
+  }
+}
+
+// add region to buffer
+void MainWindow::regionGrowing3(int posx, int posy, int slice) {  // slice is in direction x
+  if (!vol1 || posx < 0 || posx > vol1->size[1]-1 ||
+      posy  < 0 || posy  > vol1->size[2]-1 ||
+      slice < 0 || slice > vol1->size[0]-1 ||
+      hbuffer.size() != (ulong)vol1->size[0]*vol1->size[1]*vol1->size[2])
+    return;
+  float fuzzy = 0.2*fabs(windowLevel[1]-windowLevel[0])
+      * 0.2*fabs(windowLevel[1]-windowLevel[0]);
+  bool isCtrl = QApplication::keyboardModifiers() & Qt::ControlModifier;
+
+  // either the current volume is a scalar or a color field
+  if (vol1->elementLength == 1) {
+
+    boost::dynamic_bitset<ulong> done(vol1->size[0]*vol1->size[1]*vol1->size[2]); // what was found
+    std::vector<ulong> todo; // helper array to keep track what needs to be added
+    switch(vol1->dataType) {
+      case MyPrimType::UCHAR : {
+          unsigned char *d = (unsigned char *)vol1->dataPtr;
+          ulong idx = posy*vol1->size[0]*vol1->size[1]+posx*vol1->size[0]+slice;
+          float start[1];
+          start[0] = d[idx];
+          done.set(idx);
+          todo.push_back(idx);
+          for (ulong i = 0; i < todo.size(); i++) {
+            ulong here = todo.at(i);
+            int y  = floor(here/(vol1->size[0]*vol1->size[1]));
+            int x  = floor((here-(y*vol1->size[0]*vol1->size[1]))/vol1->size[0]);
+            int s  = here - (y*vol1->size[0]*vol1->size[1] + x * vol1->size[0]);
+
+            ulong n1 = (y+1)*vol1->size[0]*vol1->size[1]+x*vol1->size[0]+slice;
+            ulong n2 = (y-1)*vol1->size[0]*vol1->size[1]+x*vol1->size[0]+slice;
+            ulong n3 = (y)  *vol1->size[0]*vol1->size[1]+(x+1)*vol1->size[0]+slice;
+            ulong n4 = (y)  *vol1->size[0]*vol1->size[1]+(x-1)*vol1->size[0]+slice;
+            if (y+1 < vol1->size[2] && !done[n1]) {
+              // check intensities at this location relative to first location
+              float h[1];
+              h[0] = d[n1];
+              if ( (start[0]-h[0]) * (start[0] - h[0]) < fuzzy ) {
+                todo.push_back(n1);
+                done.set(n1);
+              }
+            }
+            if (y-1 > -1 && !done[n2]) {
+              // check intensities at this location relative to first location
+              float h[1];
+              h[0] = d[n2];
+              if ( (start[0]-h[0]) * (start[0] - h[0]) < fuzzy ) {
+                todo.push_back(n2);
+                done.set(n2);
+              }
+            }
+            if (x+1 < vol1->size[1] && !done[n3]) {
+              // check intensities at this location relative to first location
+              float h[1];
+              h[0] = d[n3];
+              if ( (start[0]-h[0]) * (start[0] - h[0]) < fuzzy ) {
+                todo.push_back(n3);
+                done.set(n3);
+              }
+            }
+            if (x-1 > -1 && !done[n4]) {
+              // check intensities at this location relative to first location
+              float h[1];
+              h[0] = d[n4];
+              if ( (start[0]-h[0]) * (start[0] - h[0]) < fuzzy ) {
+                todo.push_back(n4);
+                done.set(n4);
+              }
+            }
+          }
+          break;
+        }
+      case MyPrimType::SHORT : {
+          short *d = (short *)vol1->dataPtr;
+          ulong idx = posy*vol1->size[0]*vol1->size[1]+posx*vol1->size[0]+slice;
+          float start[1];
+          start[0] = d[idx];
+          done.set(idx);
+          todo.push_back(idx);
+          for (ulong i = 0; i < todo.size(); i++) {
+            ulong here = todo.at(i);
+            int y  = floor(here/(vol1->size[0]*vol1->size[1]));
+            int x  = floor((here-(y*vol1->size[0]*vol1->size[1]))/vol1->size[0]);
+            int s  = here - (y*vol1->size[0]*vol1->size[1] + x * vol1->size[0]);
+
+            ulong n1 = (y+1)*vol1->size[0]*vol1->size[1]+x*vol1->size[0]+slice;
+            ulong n2 = (y-1)*vol1->size[0]*vol1->size[1]+x*vol1->size[0]+slice;
+            ulong n3 = (y)  *vol1->size[0]*vol1->size[1]+(x+1)*vol1->size[0]+slice;
+            ulong n4 = (y)  *vol1->size[0]*vol1->size[1]+(x-1)*vol1->size[0]+slice;
+            if (y+1 < vol1->size[2] && !done[n1]) {
+              // check intensities at this location relative to first location
+              float h[1];
+              h[0] = d[n1];
+              if ( (start[0]-h[0]) * (start[0] - h[0]) < fuzzy ) {
+                todo.push_back(n1);
+                done.set(n1);
+              }
+            }
+            if (y-1 > -1 && !done[n2]) {
+              // check intensities at this location relative to first location
+              float h[1];
+              h[0] = d[n2];
+              if ( (start[0]-h[0]) * (start[0] - h[0]) < fuzzy ) {
+                todo.push_back(n2);
+                done.set(n2);
+              }
+            }
+            if (x+1 < vol1->size[1] && !done[n3]) {
+              // check intensities at this location relative to first location
+              float h[1];
+              h[0] = d[n3];
+              if ( (start[0]-h[0]) * (start[0] - h[0]) < fuzzy ) {
+                todo.push_back(n3);
+                done.set(n3);
+              }
+            }
+            if (x-1 > -1 && !done[n4]) {
+              // check intensities at this location relative to first location
+              float h[1];
+              h[0] = d[n4];
+              if ( (start[0]-h[0]) * (start[0] - h[0]) < fuzzy ) {
+                todo.push_back(n4);
+                done.set(n4);
+              }
+            }
+          }
+          break;
+        }
+      case MyPrimType::FLOAT : {
+          float *d = (float *)vol1->dataPtr;
+          ulong idx = posy*vol1->size[0]*vol1->size[1]+posx*vol1->size[0]+slice;
+          float start[1];
+          start[0] = d[idx];
+          done.set(idx);
+          todo.push_back(idx);
+          for (ulong i = 0; i < todo.size(); i++) {
+            ulong here = todo.at(i);
+            int y  = floor(here/(vol1->size[0]*vol1->size[1]));
+            int x  = floor((here-(y*vol1->size[0]*vol1->size[1]))/vol1->size[0]);
+            int s  = here - (y*vol1->size[0]*vol1->size[1] + x * vol1->size[0]);
+
+            ulong n1 = (y+1)*vol1->size[0]*vol1->size[1]+x*vol1->size[0]+slice;
+            ulong n2 = (y-1)*vol1->size[0]*vol1->size[1]+x*vol1->size[0]+slice;
+            ulong n3 = (y)  *vol1->size[0]*vol1->size[1]+(x+1)*vol1->size[0]+slice;
+            ulong n4 = (y)  *vol1->size[0]*vol1->size[1]+(x-1)*vol1->size[0]+slice;
+            if (y+1 < vol1->size[2] && !done[n1]) {
+              // check intensities at this location relative to first location
+              float h[1];
+              h[0] = d[n1];
+              if ( (start[0]-h[0]) * (start[0] - h[0]) < fuzzy ) {
+                todo.push_back(n1);
+                done.set(n1);
+              }
+            }
+            if (y-1 > -1 && !done[n2]) {
+              // check intensities at this location relative to first location
+              float h[1];
+              h[0] = d[n2];
+              if ( (start[0]-h[0]) * (start[0] - h[0]) < fuzzy ) {
+                todo.push_back(n2);
+                done.set(n2);
+              }
+            }
+            if (x+1 < vol1->size[1] && !done[n3]) {
+              // check intensities at this location relative to first location
+              float h[1];
+              h[0] = d[n3];
+              if ( (start[0]-h[0]) * (start[0] - h[0]) < fuzzy ) {
+                todo.push_back(n3);
+                done.set(n3);
+              }
+            }
+            if (x-1 > -1 && !done[n4]) {
+              // check intensities at this location relative to first location
+              float h[1];
+              h[0] = d[n4];
+              if ( (start[0]-h[0]) * (start[0] - h[0]) < fuzzy ) {
+                todo.push_back(n4);
+                done.set(n4);
+              }
+            }
+          }
+          break;
+        }
+      default: {
+          fprintf(stderr, "Error: this data type is not supported for this operation");
+        }
+    }
+    // now copy everything in done into the hbuffer
+    for (ulong i = 0; i < done.size(); i++) {
+      if (done[i])
+        hbuffer[i] = !isCtrl;
+    }
+  } else if (vol1->elementLength == 4) {
+    boost::dynamic_bitset<ulong> done(vol1->size[0]*vol1->size[1]*vol1->size[2]); // what was found
+    std::vector<ulong> todo; // helper array to keep track what needs to be added
+    switch(vol1->dataType) {
+      case MyPrimType::UCHAR : {
+        unsigned char *d = (unsigned char *)vol1->dataPtr;
+        ulong idx = posy*vol1->size[0]*vol1->size[1]+posx*vol1->size[0]+slice;
+
+        float start[3];
+        start[0] = d[4*idx+0];
+        start[1] = d[4*idx+1];
+        start[2] = d[4*idx+2];
+        done.set(idx);
+        todo.push_back(idx);
+        for (ulong i = 0; i < todo.size(); i++) {
+          ulong here = todo.at(i);
+          int y  = floor(here/(vol1->size[0]*vol1->size[1]));
+          int x  = floor((here-(y*vol1->size[0]*vol1->size[1]))/vol1->size[0]);
+          int s  = here - (y*vol1->size[0]*vol1->size[1] + x * vol1->size[0]);
+
+          ulong n1 = (y+1)*vol1->size[0]*vol1->size[1]+x*vol1->size[0]+slice;
+          ulong n2 = (y-1)*vol1->size[0]*vol1->size[1]+x*vol1->size[0]+slice;
+          ulong n3 = (y)  *vol1->size[0]*vol1->size[1]+(x+1)*vol1->size[0]+slice;
+          ulong n4 = (y)  *vol1->size[0]*vol1->size[1]+(x-1)*vol1->size[0]+slice;
+          if (y+1 < vol1->size[2] && !done[n1]) {
+            // check intensities at this location relative to first location
+            float h[3];
+            h[0] = d[4*n1+0];
+            h[1] = d[4*n1+1];
+            h[2] = d[4*n1+2];
+            if ( (start[0]-h[0]) * (start[0] - h[0]) +
+                 (start[1]-h[1]) * (start[1] - h[1]) +
+                 (start[2]-h[2]) * (start[2] - h[2]) < fuzzy ) {
+              todo.push_back(n1);
+              done.set(n1);
+            }
+          }
+          if (y-1 > -1 && !done[n2]) {
+            // check intensities at this location relative to first location
+            float h[3];
+            h[0] = d[4*n2+0];
+            h[1] = d[4*n2+1];
+            h[2] = d[4*n2+2];
+            if ( (start[0]-h[0]) * (start[0] - h[0]) +
+                 (start[1]-h[1]) * (start[1] - h[1]) +
+                 (start[2]-h[2]) * (start[2] - h[2]) < fuzzy ) {
+              todo.push_back(n2);
+              done.set(n2);
+            }
+          }
+          if (x+1 < vol1->size[1] && !done[n3]) {
+            // check intensities at this location relative to first location
+            float h[3];
+            h[0] = d[4*n3+0];
+            h[1] = d[4*n3+1];
+            h[2] = d[4*n3+2];
+            if ( (start[0]-h[0]) * (start[0] - h[0]) +
+                 (start[1]-h[1]) * (start[1] - h[1]) +
+                 (start[2]-h[2]) * (start[2] - h[2]) < fuzzy ) {
+              todo.push_back(n3);
+              done.set(n3);
+            }
+          }
+          if (x-1 > -1 && !done[n4]) {
+            // check intensities at this location relative to first location
+            float h[3];
+            h[0] = d[4*n4+0];
+            h[1] = d[4*n4+1];
+            h[2] = d[4*n4+2];
+            if ( (start[0]-h[0]) * (start[0] - h[0]) +
+                 (start[1]-h[1]) * (start[1] - h[1]) +
+                 (start[2]-h[2]) * (start[2] - h[2]) < fuzzy ) {
+              todo.push_back(n4);
+              done.set(n4);
+            }
+          }
+        }
+        break;
+        }
+      case MyPrimType::FLOAT : {
+        float *d = (float *)vol1->dataPtr;
+        ulong idx = posy*vol1->size[0]*vol1->size[1]+posx*vol1->size[0]+slice;
+
+        float start[3];
+        start[0] = d[4*idx+0];
+        start[1] = d[4*idx+1];
+        start[2] = d[4*idx+2];
+        done.set(idx);
+        todo.push_back(idx);
+        for (ulong i = 0; i < todo.size(); i++) {
+          ulong here = todo.at(i);
+          int y  = floor(here/(vol1->size[0]*vol1->size[1]));
+          int x  = floor((here-(y*vol1->size[0]*vol1->size[1]))/vol1->size[0]);
+          int s  = here - (y*vol1->size[0]*vol1->size[1] + x * vol1->size[0]);
+
+          ulong n1 = (y+1)*vol1->size[0]*vol1->size[1]+x*vol1->size[0]+slice;
+          ulong n2 = (y-1)*vol1->size[0]*vol1->size[1]+x*vol1->size[0]+slice;
+          ulong n3 = (y)  *vol1->size[0]*vol1->size[1]+(x+1)*vol1->size[0]+slice;
+          ulong n4 = (y)  *vol1->size[0]*vol1->size[1]+(x-1)*vol1->size[0]+slice;
+          if (y+1 < vol1->size[2] && !done[n1]) {
+            // check intensities at this location relative to first location
+            float h[3];
+            h[0] = d[4*n1+0];
+            h[1] = d[4*n1+1];
+            h[2] = d[4*n1+2];
+            if ( (start[0]-h[0]) * (start[0] - h[0]) +
+                 (start[1]-h[1]) * (start[1] - h[1]) +
+                 (start[2]-h[2]) * (start[2] - h[2]) < fuzzy ) {
+              todo.push_back(n1);
+              done.set(n1);
+            }
+          }
+          if (y-1 > -1 && !done[n2]) {
+            // check intensities at this location relative to first location
+            float h[3];
+            h[0] = d[4*n2+0];
+            h[1] = d[4*n2+1];
+            h[2] = d[4*n2+2];
+            if ( (start[0]-h[0]) * (start[0] - h[0]) +
+                 (start[1]-h[1]) * (start[1] - h[1]) +
+                 (start[2]-h[2]) * (start[2] - h[2]) < fuzzy ) {
+              todo.push_back(n2);
+              done.set(n2);
+            }
+          }
+          if (x+1 < vol1->size[1] && !done[n3]) {
+            // check intensities at this location relative to first location
+            float h[3];
+            h[0] = d[4*n3+0];
+            h[1] = d[4*n3+1];
+            h[2] = d[4*n3+2];
+            if ( (start[0]-h[0]) * (start[0] - h[0]) +
+                 (start[1]-h[1]) * (start[1] - h[1]) +
+                 (start[2]-h[2]) * (start[2] - h[2]) < fuzzy ) {
+              todo.push_back(n3);
+              done.set(n3);
+            }
+          }
+          if (x-1 > -1 && !done[n4]) {
+            // check intensities at this location relative to first location
+            float h[3];
+            h[0] = d[4*n4+0];
+            h[1] = d[4*n4+1];
+            h[2] = d[4*n4+2];
+            if ( (start[0]-h[0]) * (start[0] - h[0]) +
+                 (start[1]-h[1]) * (start[1] - h[1]) +
+                 (start[2]-h[2]) * (start[2] - h[2]) < fuzzy ) {
+              todo.push_back(n4);
+              done.set(n4);
+            }
+          }
+        }
+        break;
+      }
+    }
+    // now copy everything in done into the hbuffer
+    for (ulong i = 0; i < done.size(); i++) {
+      if (done[i])
+        hbuffer[i] = !isCtrl;
+    }
+  } else {
+    fprintf(stderr, "unknown element length for volume 1");
+  }
+}
+
+
+
+void MainWindow::myMouseButtonDblClick(QObject *object, QMouseEvent *mouseEvent) {
+  if (object != Image1 && object != Image2 && object != Image3 )
+    return;
+
+  if (object == Image1) {
+    slicePosition[0] = (int)floor( mouseEvent->pos().x() / scaleFactor1);
+    slicePosition[1] = (int)floor( mouseEvent->pos().y() / scaleFactor1);
+    // slicePosition[2] = (int)floor( mouseEvent->pos().x() / scaleFactor1 + 0.5);
+    update();
+  } else if (object == Image2) {
+    slicePosition[0] = (int)floor( mouseEvent->pos().x() / scaleFactor23);
+    //slicePosition[1] = (int)floor( mouseEvent->pos().y() / scaleFactor23);
+    slicePosition[2] = (int)floor( mouseEvent->pos().y() / scaleFactor23);
+    update();
+  } else if (object == Image3) {
+    // slicePosition[0] = (int)floor( mouseEvent->pos().x() / scaleFactor23);
+    slicePosition[1] = (int)floor( mouseEvent->pos().x() / scaleFactor23);
+    slicePosition[2] = (int)floor( mouseEvent->pos().y() / scaleFactor23);
+    update();
+  }
+}
+
+bool MainWindow::myMouseWheelEvent (QObject *object, QWheelEvent * e) {
+  if (object != Image1 && object != Image2 && object != Image3 )
+    return false;
 
   int numDegrees = e->delta() / 8;
   int numSteps = numDegrees / 15;
 
-  if (object == ui->Image1) {
+  if (object == Image1) {
     if (e->orientation() == Qt::Vertical) {
       slicePosition[2] += numSteps;
       update();
     }
     e->accept();
-  } else if (object == ui->Image2) {
+  } else if (object == Image2) {
     if (e->orientation() == Qt::Vertical) {
       slicePosition[1] += numSteps;
       update();
     }
     e->accept();
-  } else if (object == ui->Image3) {
+  } else if (object == Image3) {
     if (e->orientation() == Qt::Vertical) {
       slicePosition[0] += numSteps;
       update();
     }
     e->accept();
   }
+  return true;
 }
 
 void MainWindow::setupDefaultMaterials() {
 
-    QTreeWidgetItem *newItem = new QTreeWidgetItem(ui->treeWidget, QStringList(QString("Exterior")));
-    newItem->setText(1, QString("%1").arg(0));
-    QColor color = QColor::fromRgb(0,0,0);
-    newItem->setBackground(2, QBrush(color));
+  QTreeWidgetItem *newItem = new QTreeWidgetItem(ui->treeWidget, QStringList(QString("Exterior")));
+  newItem->setText(1, QString("%1").arg(0));
+  QColor color = QColor::fromRgb(0,0,0);
+  newItem->setBackground(2, QBrush(color));
 
-    int newMaterialIdx = 1;
-    newItem = new QTreeWidgetItem(ui->treeWidget, QStringList(QString("material%1").arg(newMaterialIdx)));
-    newItem->setText(1, QString("%1").arg(newMaterialIdx));
-    color = QColor::fromRgb(255,127,0);
-    newItem->setBackground(2, QBrush(color));
+  int newMaterialIdx = 1;
+  newItem = new QTreeWidgetItem(ui->treeWidget, QStringList(QString("material%1").arg(newMaterialIdx)));
+  newItem->setText(1, QString("%1").arg(newMaterialIdx));
+  color = QColor::fromRgb(255,127,0);
+  newItem->setBackground(2, QBrush(color));
 
-    newMaterialIdx++;
-    newItem = new QTreeWidgetItem(ui->treeWidget, QStringList(QString("material%1").arg(newMaterialIdx)));
-    newItem->setText(1, QString("%1").arg(newMaterialIdx));
-    color = QColor::fromRgb(255,250,20);
-    newItem->setBackground(2, QBrush(color));
+  newMaterialIdx++;
+  newItem = new QTreeWidgetItem(ui->treeWidget, QStringList(QString("material%1").arg(newMaterialIdx)));
+  newItem->setText(1, QString("%1").arg(newMaterialIdx));
+  color = QColor::fromRgb(255,250,20);
+  newItem->setBackground(2, QBrush(color));
 }
 
 // put them into the interface
@@ -228,11 +1744,15 @@ void MainWindow::getMaterialsFromLabel() {
   if (!lab1)
     return; // nothing to do
 
+  // remove already existing entries first
+  ui->treeWidget->clear();
+
   for (unsigned int i = 0; i < lab1->materialNames.size(); i++) {
+    QColor *color = lab1->materialColors.at(i);
     QTreeWidgetItem *newItem = new QTreeWidgetItem(ui->treeWidget, QStringList(lab1->materialNames.at(i)));
     newItem->setText(1, QString("%1").arg(i));
-    QColor color = lab1->materialColors.at(i);
-    newItem->setBackground(2, QBrush(color));
+    newItem->setFlags(newItem->flags() | Qt::ItemIsEditable);
+    newItem->setBackground(2, QBrush(*color));
   }
 }
 
@@ -240,73 +1760,142 @@ void MainWindow::getMaterialsFromLabel() {
 // add new material
 void MainWindow::on_pushButton_clicked()
 {
-    int newMaterialIdx = ui->treeWidget->topLevelItemCount();
-    QString name = QString("material%1").arg(newMaterialIdx);
-    QTreeWidgetItem *newItem = new QTreeWidgetItem(ui->treeWidget, QStringList(name));
-    newItem->setText(1, QString("%1").arg(newMaterialIdx));
-    QColor color = QColorDialog::getColor();
-    newItem->setBackground(2, QBrush(color));
+  if (!lab1)
+    CreateLabel();
 
-    // add this material to lab1 as well
-    if (lab1) {
-      lab1->materialNames.push_back(name);
-      lab1->materialColors.push_back(color);
-    }
+  int newMaterialIdx = ui->treeWidget->topLevelItemCount();
+  QString name = QString("material%1").arg(newMaterialIdx);
+  QTreeWidgetItem *newItem = new QTreeWidgetItem(ui->treeWidget, QStringList(name));
+  newItem->setText(1, QString("%1").arg(newMaterialIdx));
+  newItem->setFlags(newItem->flags() | Qt::ItemIsEditable);
+  QColor *color = new QColor(QColorDialog::getColor());
+  newItem->setBackground(2, QBrush(*color));
+
+  // add this material to lab1 as well
+  if (lab1) {
+    lab1->materialNames.push_back(name);
+    lab1->materialColors.push_back(color);
+    // we need to update the entry if its getting changed as well
+  }
 }
 
 // delete the currently selected material
 void MainWindow::on_pushButton_2_clicked()
 {
-    int index = ui->treeWidget->indexOfTopLevelItem(ui->treeWidget->currentItem());
-    delete ui->treeWidget->takeTopLevelItem(index);
+  QTreeWidgetItem *item = ui->treeWidget->currentItem();
+  int idx = item->text(1).toInt();
+  // remove material from label field as well
+  if (idx < lab1->materialNames.size()) {
+    lab1->materialColors.erase(lab1->materialColors.begin()+idx);
+    lab1->materialNames.erase(lab1->materialNames.begin()+idx);
+  }
+
+  int index = ui->treeWidget->indexOfTopLevelItem(item);
+  delete ui->treeWidget->takeTopLevelItem(index);
+}
+
+
+QStringList MainWindow::fetchModel(QString aString)
+{
+/*    QString urlString("http://en.wikipedia.org/w/api.php?action=opensearch&search=");
+    urlString.append(aString);
+    urlString.append("&format=json&callback=spellcheck");
+
+    QUrl url(urlString);
+    nam->get(QNetworkRequest(url));
+
+    return iStringList; */
+}
+
+void MainWindow::finishedSlot(QNetworkReply* reply)
+{
+/*    // Reading attributes of the reply
+    // e.g. the HTTP status code
+    QVariant statusCodeV =
+            reply->attribute(QNetworkRequest::HttpStatusCodeAttribute);
+    // Or the target URL if it was a redirect:
+    QVariant redirectionTargetUrl =
+            reply->attribute(QNetworkRequest::RedirectionTargetAttribute);
+
+    // no error received?
+    if (reply->error() == QNetworkReply::NoError)
+    {
+        // read data from QNetworkReply here
+
+        //  Reading bytes form the reply
+        QByteArray bytes = reply->readAll();  // bytes
+        QString string(bytes); // string
+
+        ParseSpellResponse(string);
+
+    }
+    // Some http error received
+    else
+    {
+        // handle errors here
+    }
+
+*/
 }
 
 void MainWindow::LoadImage() {
-    QString fileName = QFileDialog::getOpenFileName(this,
-                                                    tr("Open File"), QDir::currentPath());
-    if (!fileName.isEmpty()) {
-      ReadMGZ *reader = new ReadMGZ(fileName);
-      std::vector<ScalarVolume> *volumes = reader->getVolume();
-      if (!volumes || volumes->size() < 1) {
-        fprintf(stderr, "Error: no volumes could be found");
-        return;
-      }
 
-      if (volumes->size() == 4) {
-        vol1 = (Volume *)volumes->at(0).convertToColorVolume(&volumes->at(0),
-                                                  &volumes->at(1),
-                                                  &volumes->at(2),
-                                                  &volumes->at(3));
-      } else if (volumes->size() == 3) {
-        vol1 = (Volume *)volumes->at(0).convertToColorVolume(&volumes->at(0),
-                                                  &volumes->at(1),
-                                                  &volumes->at(2));
-      } else if (volumes->size() == 1) {
-        vol1 = (Volume *)&volumes->at(0);
-      }
-
-      if (volumes->size() > 1 && volumes->size() != 3 && volumes->size() != 4) {
-        QMessageBox::information(this, tr("Image Segmentation Editor"),
-                                 tr("More than one volume in file %1. Show the first volume only.").arg(fileName));
-        fprintf(stderr, "Warning: several volumes found in the file, use only the first volume");
-      }
-      windowLevel[0] = vol1->autoWindowLevel[0];
-      windowLevel[1] = vol1->autoWindowLevel[1];
-      if (slicePosition.size() == 0) { // otherwise we have already a slice position
-        slicePosition.push_back(vol1->size[0]/2);
-        slicePosition.push_back(vol1->size[1]/2);
-        slicePosition.push_back(vol1->size[2]/2);
-        fprintf(stderr, "image with data range: %f %f ", vol1->range[0], vol1->range[1]);
-      }
-
-      updateActions();
-
-      update();
-
-      scaleImage(1.0);
-
-      //showHistogram(vol1, ui->windowLevelHistogram);
+  QString fileName = QFileDialog::getOpenFileName(this,
+                                                  tr("Open File"), currentPath.absolutePath());
+  if (!fileName.isEmpty()) {
+    // set current path to new location
+    currentPath.setPath( currentPath.filePath(fileName) );
+    ReadMGZ *reader = new ReadMGZ(fileName);
+    std::vector<ScalarVolume*> *rvolumes = reader->getVolume();
+    if (!rvolumes || rvolumes->size() < 1) {
+      fprintf(stderr, "Error: no volumes could be found");
+      return;
     }
+
+    if (rvolumes->size() == 4) {
+      ScalarVolume *first = (ScalarVolume *)rvolumes->at(0);
+      vol1 = (Volume *)first->convertToColorVolume(rvolumes->at(0),
+                                                   rvolumes->at(1),
+                                                   rvolumes->at(2),
+                                                   rvolumes->at(3));
+    } else if (rvolumes->size() == 3) {
+      vol1 = (Volume *)rvolumes->at(0)->convertToColorVolume(rvolumes->at(0),
+                                                             rvolumes->at(1),
+                                                             rvolumes->at(2));
+    } else if (rvolumes->size() == 1) {
+      vol1 = (Volume *)rvolumes->at(0);
+    }
+
+    if (rvolumes->size() > 1 && rvolumes->size() != 3 && rvolumes->size() != 4) {
+      QMessageBox::information(this, tr("Image Segmentation Editor"),
+                               tr("More than one volume in file %1. Show the first volume only.").arg(fileName));
+      fprintf(stderr, "Warning: several volumes found in the file, use only the first volume");
+    }
+    windowLevel[0] = vol1->autoWindowLevel[0];
+    windowLevel[1] = vol1->autoWindowLevel[1];
+    if (slicePosition.size() == 0) { // otherwise we have already a slice position
+      slicePosition.push_back(vol1->size[0]/2);
+      slicePosition.push_back(vol1->size[1]/2);
+      slicePosition.push_back(vol1->size[2]/2);
+      fprintf(stderr, "image with data range: %f %f ", vol1->range[0], vol1->range[1]);
+    }
+
+    updateActions();
+
+    update();
+
+    scaleImage(1.0);
+
+    // append this to volumes if its not already there
+    bool found = false;
+    for (unsigned int i = 0; i < volumes.size(); i++) {
+      if (vol1->filename == volumes[i]->filename)
+        found = true; // already loaded
+    }
+    if (found == false)
+      volumes.push_back(vol1);
+    //showHistogram(vol1, ui->windowLevelHistogram);
+  }
 }
 
 // draw the histogram
@@ -338,10 +1927,10 @@ void MainWindow::showHistogram(Volume *vol1, QGraphicsView *gv) {
   gv->setScene(scene);
   float wi = w/(double)(vol1->hist.size()-1);
   for (unsigned int i = 0; i < vol1->hist.size(); i+=3) {
-     float x   = i * wi;
-     float y   = h - (histTmp[i]*h);
-     float val = histTmp[i]*h;
-     scene->addRect(x, y, 3, val );
+    float x   = i * wi;
+    float y   = h - (histTmp[i]*h);
+    float val = histTmp[i]*h;
+    scene->addRect(x, y, 3, val );
   }
   gv->setViewportUpdateMode(QGraphicsView::MinimalViewportUpdate);
   gv->setRenderHint(QPainter::Antialiasing, false);
@@ -351,71 +1940,177 @@ void MainWindow::showHistogram(Volume *vol1, QGraphicsView *gv) {
 void MainWindow::LoadLabel() {
   QString fileName = QFileDialog::getOpenFileName(this,
                                                   tr("Open File"), QDir::currentPath());
-  if (!fileName.isEmpty()) {
-    ReadMGZ *reader = new ReadMGZ(fileName);
-    std::vector<ScalarVolume> *volumes = reader->getVolume();
-    if (!volumes || volumes->size() < 1) {
-      fprintf(stderr, "Error: no volumes could be found");
-      return;
-    }
-
-    if (volumes->size() > 1) {
-      QMessageBox::information(this, tr("Image Segmentation Editor"),
-                               tr("More than one volume in file %1. Show the first volume only.").arg(fileName));
-      fprintf(stderr, "Warning: several volumes found in the file, use only the first volume");
-    }
-    lab1 = (Volume *)&volumes->at(0);
-    windowLevelOverlay[0] = lab1->autoWindowLevel[0];
-    windowLevelOverlay[1] = lab1->autoWindowLevel[1];
-
-    getMaterialsFromLabel();
-    update();
-
-    hbuffer.resize( (ulong)lab1->size[0] * lab1->size[1] * lab1->size[2] );
-
+  if (fileName.isEmpty()) {
+    fprintf(stderr, "no file selected");
+    return;
   }
+  ReadMGZ *reader = new ReadMGZ(fileName);
+  std::vector<ScalarVolume *> *rvolumes = reader->getVolume();
+  if (!rvolumes || rvolumes->size() < 1) {
+    fprintf(stderr, "Error: no volumes could be found");
+    return;
+  }
+
+  if (rvolumes->size() > 1) {
+    QMessageBox::information(this, tr("Image Segmentation Editor"),
+                             tr("More than one volume in file %1. Show the first volume only.").arg(fileName));
+    fprintf(stderr, "Warning: several volumes found in the file, use only the first volume");
+  }
+  lab1 = (Volume *)rvolumes->at(0);
+  windowLevelOverlay[0] = lab1->autoWindowLevel[0];
+  windowLevelOverlay[1] = lab1->autoWindowLevel[1];
+
+  getMaterialsFromLabel();
+  update();
+
+  hbuffer.resize( (ulong)lab1->size[0] * lab1->size[1] * lab1->size[2] );
+
+  // append to list of loaded labels
+  bool found = false;
+  for (unsigned int i = 0; i < labels.size(); i++) {
+    if (labels[i]->filename == lab1->filename)
+      found = true;
+  }
+  if (found == false) {
+    labels.push_back(lab1);
+  }
+
+  // read in the label field json file if there is one
+  QJsonDocument desc = QJsonDocument();
+  QFile file;
+  file.setFileName(QFileInfo(fileName).absolutePath() + QDir::separator() + QFileInfo(fileName).baseName() + ".json");
+  if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+     QTextStream streamFileIn(&file);
+     QJsonParseError error;
+     desc = QJsonDocument::fromJson(streamFileIn.readAll().toUtf8(), &error);
+     file.close();
+     if (desc.isNull()) {
+       fprintf(stderr, "Error: parsing json file %s failed", file.fileName().toLatin1().data());
+       return;
+     }
+     // put them into the file instead of the default onces
+     lab1->materialNames.resize(0);
+     lab1->materialColors.resize(0);
+     QJsonObject obj = desc.object();
+     QJsonArray materials = obj.value(QString("materials")).toArray();
+     for (int i = 0; i < materials.size(); i++) {
+       QJsonArray values = materials.at(i).toArray();
+       QString name = values.at(0).toString();
+       int idx = (int)values.at(1).toDouble();
+       if (idx != i) {
+         fprintf(stderr, "Error: the index in the file does not correspond to the order of the elements in the array");
+       }
+       QJsonArray color = values.at(2).toArray();
+       double red   = color.at(0).toDouble();
+       double green = color.at(1).toDouble();
+       double blue  = color.at(2).toDouble();
+       double alpha = color.at(3).toDouble();
+       QColor *c = new QColor;
+       c->setRgb((int)red, (int)green, (int)blue, (int)alpha);
+       lab1->materialNames.push_back(name);
+       lab1->materialColors.push_back(c);
+     }
+     getMaterialsFromLabel();
+  }
+
 }
 
 void MainWindow::SaveLabel() {
+  if (!lab1)
+    return; // do nothing
   QString fileName = QFileDialog::getSaveFileName(this,
-                                                  tr("Save File"), QDir::homePath());
+                                                  tr("Save File"), currentPath.absolutePath());
   if (!fileName.isEmpty()) {
-     ((ScalarVolume *)lab1)->saveAs(fileName);
+    ((ScalarVolume *)lab1)->saveAs(fileName);
+
+    // save the labels with their color as JSON file (same directory)
+    // we can look for this file once we load a dataset again
+
+    QJsonObject materials = QJsonObject();
+    materials.insert("loadCmd", lab1->loadCmd);
+    materials.insert("filename", lab1->filename);
+    materials.insert("type", QString("labelfield"));
+    QJsonArray dat = QJsonArray();
+    for (unsigned int i = 0; i < lab1->materialNames.size(); i++) {
+      QString name = lab1->materialNames.at(i);
+      QColor *color = lab1->materialColors.at(i);
+      int index = i;
+
+      QJsonArray material = QJsonArray();
+      material.insert(0, name);
+      material.insert(1,index);
+      QJsonArray c = QJsonArray();
+      int cc = color->red();
+      int cb = color->green();
+      c.insert(0, color->red());
+      c.insert(1, color->green());
+      c.insert(2, color->blue());
+      c.insert(3, color->alpha());
+      material.insert(2,c);
+
+      dat.append(material);
+    }
+    materials.insert("materials", dat);
+
+    QJsonDocument desc = QJsonDocument(materials);
+    QFile file;
+
+    file.setFileName(QFileInfo(fileName).absolutePath() + QDir::separator() + QFileInfo(fileName).baseName() + ".json");
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text | QIODevice::Truncate)) {
+      fprintf(stderr, "Error: could not open json file to save labels");
+      return;
+    }
+    QTextStream streamFileOut(&file);
+    streamFileOut.setCodec("UTF-8");
+    streamFileOut << desc.toJson();
+    streamFileOut.flush();
+    file.close();
   }
 }
 
 
 void MainWindow::CreateLabel() {
-    if (!vol1) {
-        // cannot be created without volume loaded first
-        QMessageBox::information(this, tr("Image Segmentation Editor"),
-                                 tr("Load a volume first."));
-        return;
-    }
-    lab1 = (Volume*)new ScalarVolume(vol1->size, MyPrimType::UCHAR);
-    memset(lab1->dataPtr, 0, lab1->size[0]*lab1->size[1]*lab1->size[2]);
-    lab1->range[0] = 0; lab1->range[1] = 0;
-    lab1->computeHist();
-    getMaterialsFromLabel();
-    hbuffer.resize( (ulong)lab1->size[0] * lab1->size[1] * lab1->size[2] );
+  if (!vol1) {
+    // cannot be created without volume loaded first
+    QMessageBox::information(this, tr("Image Segmentation Editor"),
+                             tr("Load a volume first."));
+    return;
+  }
+  lab1 = (Volume*)new ScalarVolume(vol1->size, MyPrimType::UCHAR);
+  lab1->filename = QString("label created on ") + QDateTime::currentDateTime().toString();
+  memset(lab1->dataPtr, 0, lab1->size[0]*lab1->size[1]*lab1->size[2]);
+  lab1->range[0] = 0; lab1->range[1] = 0;
+  lab1->computeHist();
+  getMaterialsFromLabel();
+  hbuffer.resize( (ulong)lab1->size[0] * lab1->size[1] * lab1->size[2] );
 }
 
 void MainWindow::createActions() {
-    ui->actionLoad_Image->setShortcut(tr("Ctrl+I"));
-    connect(ui->actionLoad_Image, SIGNAL(triggered()), this, SLOT(LoadImage()));
+  ui->actionLoad_Image->setShortcut(tr("Ctrl+I"));
+  connect(ui->actionLoad_Image, SIGNAL(triggered()), this, SLOT(LoadImage()));
 
-    ui->actionSave_Label->setShortcut(tr("Ctrl+S"));
-    connect(ui->actionSave_Label, SIGNAL(triggered()), this, SLOT(SaveLabel()));
+  ui->actionSave_Label->setShortcut(tr("Ctrl+S"));
+  connect(ui->actionSave_Label, SIGNAL(triggered()), this, SLOT(SaveLabel()));
 
-    ui->actionLoad_Label->setShortcut(tr("Ctrl+L"));
-    connect(ui->actionLoad_Label, SIGNAL(triggered()), this, SLOT(LoadLabel()));
+  ui->actionLoad_Label->setShortcut(tr("Ctrl+L"));
+  connect(ui->actionLoad_Label, SIGNAL(triggered()), this, SLOT(LoadLabel()));
 
-    ui->actionCreate_New_Label->setShortcut(tr("Ctrl+N"));
-    connect(ui->actionCreate_New_Label, SIGNAL(triggered()), this, SLOT(CreateLabel()));
+  ui->actionCreate_New_Label->setShortcut(tr("Ctrl+N"));
+  connect(ui->actionCreate_New_Label, SIGNAL(triggered()), this, SLOT(CreateLabel()));
+
+  ui->actionImage_Segmentation_Editor->setShortcut(tr("Ctrl+A"));
+  connect(ui->actionImage_Segmentation_Editor, SIGNAL(triggered()), this, SLOT(about()));
+}
+
+void MainWindow::about() {
+  QMessageBox::about(this, tr("About Image Segmentation Editor"),
+                     tr("<p>The <b>Image Segmentation Editor v0.2</b> is an application that"
+                        " supports image segmentation on multi-modal image data."
+                        "</p><br/>Hauke Bartsch, Dr. rer. nat. 2013"));
 }
 
 void MainWindow::FillHighlight(int which) {
-  fprintf(stderr, "fill in highlight");
+  //fprintf(stderr, "fill in highlight");
   if (!hbuffer.size())
     return;
 
@@ -462,78 +2157,82 @@ void MainWindow::FillHighlight(int which) {
 }
 
 void MainWindow::updateActions() {
-    //zoomInAct->setEnabled(!fitToWindowAct->isChecked());
-    //zoomOutAct->setEnabled(!fitToWindowAct->isChecked());
-    //normalSizeAct->setEnabled(!fitToWindowAct->isChecked());
+  //zoomInAct->setEnabled(!fitToWindowAct->isChecked());
+  //zoomOutAct->setEnabled(!fitToWindowAct->isChecked());
+  //normalSizeAct->setEnabled(!fitToWindowAct->isChecked());
 }
 
 void MainWindow::normalSize() {
-    ui->Image1->adjustSize();
-    ui->Image2->adjustSize();
-    ui->Image3->adjustSize();
-    scaleFactor1 = 1.0;
-    scaleFactor23 = 1.0;
+  Image1->adjustSize();
+  Image2->adjustSize();
+  Image3->adjustSize();
+  scaleFactor1 = 1.0;
+  scaleFactor23 = 1.0;
 }
 
 void MainWindow::adjustScrollBar(QScrollBar *scrollBar, double factor) {
-    scrollBar->setValue(int(factor * scrollBar->value()
-                            + ((factor - 1) * scrollBar->pageStep()/2)));
+  scrollBar->setValue(int(factor * scrollBar->value()
+                          + ((factor - 1) * scrollBar->pageStep()/2)));
 }
 
 void MainWindow::scaleImage(double factor) {
   if (!vol1)
     return;
 
-    Q_ASSERT(ui->Image1->pixmap());
-    Q_ASSERT(ui->Image2->pixmap());
-    Q_ASSERT(ui->Image3->pixmap());
+  Q_ASSERT(Image1->pixmap());
+  Q_ASSERT(Image2->pixmap());
+  Q_ASSERT(Image3->pixmap());
 
-    scaleFactor1 *= factor;
-    scaleFactor23 *= factor;
-    ui->Image1->resize(scaleFactor1  * ui->Image1->pixmap()->size());
-    ui->Image2->resize(scaleFactor23 * ui->Image2->pixmap()->size());
-    ui->Image3->resize(scaleFactor23 * ui->Image3->pixmap()->size());
+  scaleFactor1 *= factor;
+  scaleFactor23 *= factor;
+  Image1->resize(scaleFactor1  * Image1->pixmap()->size());
+  Image2->resize(scaleFactor23 * Image2->pixmap()->size());
+  Image3->resize(scaleFactor23 * Image3->pixmap()->size());
 
-    adjustScrollBar(ui->scrollArea_4->horizontalScrollBar(), factor);
-    adjustScrollBar(ui->scrollArea_4->verticalScrollBar(), factor);
+  ui->scrollArea_4->setWidgetResizable(false);
+  ui->scrollArea_2->setWidgetResizable(false);
+  ui->scrollArea_3->setWidgetResizable(false);
 
-    adjustScrollBar(ui->scrollArea_2->horizontalScrollBar(), factor);
-    adjustScrollBar(ui->scrollArea_2->verticalScrollBar(), factor);
+  adjustScrollBar(ui->scrollArea_4->horizontalScrollBar(), scaleFactor1);
+  adjustScrollBar(ui->scrollArea_4->verticalScrollBar(), factor);
 
-    adjustScrollBar(ui->scrollArea_3->horizontalScrollBar(), factor);
-    adjustScrollBar(ui->scrollArea_3->verticalScrollBar(), factor);
+  adjustScrollBar(ui->scrollArea_2->horizontalScrollBar(), factor);
+  adjustScrollBar(ui->scrollArea_2->verticalScrollBar(), factor);
 
-    //zoomInAct->setEnabled(scaleFactor < 3.0);
-    //zoomOutAct->setEnabled(scaleFactor > 0.333);
+  adjustScrollBar(ui->scrollArea_3->horizontalScrollBar(), factor);
+  adjustScrollBar(ui->scrollArea_3->verticalScrollBar(), factor);
+
+  //zoomInAct->setEnabled(scaleFactor < 3.0);
+  //zoomOutAct->setEnabled(scaleFactor > 0.333);
 }
 
 // update the display
 void MainWindow::update() {
-    if (!vol1)
-        return; // do nothing
-    if (slicePosition.size() < 3)
-        return;
+  if (!vol1)
+    return; // do nothing
+  if (slicePosition.size() < 3)
+    return;
 
-    // normalize slice position
-    if (slicePosition[0] < 0)
-        slicePosition[0] = 0;
-    if (slicePosition[1] < 0)
-        slicePosition[1] = 0;
-    if (slicePosition[2] < 0)
-        slicePosition[2] = 0;
-    if (slicePosition[0] > vol1->size[0]-1)
-        slicePosition[0] = vol1->size[0]-1;
-    if (slicePosition[1] > vol1->size[1]-1)
-        slicePosition[1] = vol1->size[1]-1;
-    if (slicePosition[2] > vol1->size[2]-1)
-        slicePosition[2] = vol1->size[2]-1;
+  // normalize slice position
+  if (slicePosition[0] < 0)
+    slicePosition[0] = 0;
+  if (slicePosition[1] < 0)
+    slicePosition[1] = 0;
+  if (slicePosition[2] < 0)
+    slicePosition[2] = 0;
+  if (slicePosition[0] > vol1->size[0]-1)
+    slicePosition[0] = vol1->size[0]-1;
+  if (slicePosition[1] > vol1->size[1]-1)
+    slicePosition[1] = vol1->size[1]-1;
+  if (slicePosition[2] > vol1->size[2]-1)
+    slicePosition[2] = vol1->size[2]-1;
 
-    // draw first image
-    updateImage1(slicePosition[2]);
-    updateImage2(slicePosition[1]);
-    updateImage3(slicePosition[0]);
+  // draw first image
+  updateImage1(slicePosition[2]);
+  updateImage2(slicePosition[1]);
+  updateImage3(slicePosition[0]);
 
-    ui->label->setText(QString("x: %1 y: %2 z: %3").arg(slicePosition[0]).arg(slicePosition[1]).arg(slicePosition[2]));
+  ui->label->setText(QString("x: %1 y: %2 z: %3").arg(slicePosition[0]).arg(slicePosition[1]).arg(slicePosition[2]));
 }
 
 unsigned char * MainWindow::fillBuffer1(int pos, Volume *vol1, float alpha) {
@@ -694,131 +2393,63 @@ unsigned char * MainWindow::fillBuffer1AsColor(int pos, ScalarVolume *vol1, floa
   unsigned char *d = vol1->dataPtr + offset;
   unsigned char *buffer = (unsigned char*)malloc(4 * vol1->size[0] * vol1->size[1]);
   switch(vol1->dataType) {
-  case MyPrimType::UCHAR :
-  case MyPrimType::CHAR : {
-      unsigned char *data = (unsigned char *)d;
-      for (long i = 0; i < (long)vol1->size[0]*vol1->size[1]; i++) {
-          buffer[i*4+0] = vol1->materialColors.at(data[0]).blue(); // blue
-          buffer[i*4+1] = vol1->materialColors.at(data[0]).green(); // green
-          buffer[i*4+2] = vol1->materialColors.at(data[0]).red(); // red
+    case MyPrimType::UCHAR :
+    case MyPrimType::CHAR : {
+        unsigned char *data = (unsigned char *)d;
+        for (long i = 0; i < (long)vol1->size[0]*vol1->size[1]; i++) {
+          buffer[i*4+0] = vol1->materialColors.at(data[0])->blue(); // blue
+          buffer[i*4+1] = vol1->materialColors.at(data[0])->green(); // green
+          buffer[i*4+2] = vol1->materialColors.at(data[0])->red(); // red
           buffer[i*4+3] = data[0]==0?0:alpha; // alpha (0..254)
           data++;
+        }
+        break;
       }
-      break;
-  }
-  case MyPrimType::SHORT : {
-      signed short *data = (signed short *)d;
-      for (long i = 0; i < (long)vol1->size[0]*vol1->size[1]; i++) {
-          buffer[i*4+0] = vol1->materialColors.at(data[0]).blue();
-          buffer[i*4+1] = vol1->materialColors.at(data[0]).green();
-          buffer[i*4+2] = vol1->materialColors.at(data[0]).red();
+    case MyPrimType::SHORT : {
+        signed short *data = (signed short *)d;
+        for (long i = 0; i < (long)vol1->size[0]*vol1->size[1]; i++) {
+          buffer[i*4+0] = vol1->materialColors.at(data[0])->blue();
+          buffer[i*4+1] = vol1->materialColors.at(data[0])->green();
+          buffer[i*4+2] = vol1->materialColors.at(data[0])->red();
           buffer[i*4+3] = data[0]==0?0:alpha;
           data++;
+        }
+        break;
       }
-      break;
-  }
-  case MyPrimType::USHORT : {
-      unsigned short *data = (unsigned short *)d;
-      for (long i = 0; i < (long)vol1->size[0]*vol1->size[1]; i++) {
-          buffer[i*4+0] = vol1->materialColors.at(data[0]).blue();
-          buffer[i*4+1] = vol1->materialColors.at(data[0]).green();
-          buffer[i*4+2] = vol1->materialColors.at(data[0]).red();
+    case MyPrimType::USHORT : {
+        unsigned short *data = (unsigned short *)d;
+        for (long i = 0; i < (long)vol1->size[0]*vol1->size[1]; i++) {
+          buffer[i*4+0] = vol1->materialColors.at(data[0])->blue();
+          buffer[i*4+1] = vol1->materialColors.at(data[0])->green();
+          buffer[i*4+2] = vol1->materialColors.at(data[0])->red();
           buffer[i*4+3] = data[0]==0?0:alpha;
           data++;
+        }
+        break;
       }
-      break;
-  }
-  case MyPrimType::INT : {
-      signed int *data = (signed int *)d;
-      for (long i = 0; i < (long)vol1->size[0]*vol1->size[1]; i++) {
-          buffer[i*4+0] = vol1->materialColors.at(data[0]).blue();
-          buffer[i*4+1] = vol1->materialColors.at(data[0]).green();
-          buffer[i*4+2] = vol1->materialColors.at(data[0]).red();
+    case MyPrimType::INT : {
+        signed int *data = (signed int *)d;
+        for (long i = 0; i < (long)vol1->size[0]*vol1->size[1]; i++) {
+          buffer[i*4+0] = vol1->materialColors.at(data[0])->blue();
+          buffer[i*4+1] = vol1->materialColors.at(data[0])->green();
+          buffer[i*4+2] = vol1->materialColors.at(data[0])->red();
           buffer[i*4+3] = data[0]==0?0:alpha;
           data++;
+        }
+        break;
       }
-      break;
-  }
-  case MyPrimType::UINT : {
-      unsigned int *data = (unsigned int *)d;
-      for (long i = 0; i < (long)vol1->size[0]*vol1->size[1]; i++) {
-          buffer[i*4+0] = vol1->materialColors.at(data[0]).blue();
-          buffer[i*4+1] = vol1->materialColors.at(data[0]).green();
-          buffer[i*4+2] = vol1->materialColors.at(data[0]).red();
+    case MyPrimType::UINT : {
+        unsigned int *data = (unsigned int *)d;
+        for (long i = 0; i < (long)vol1->size[0]*vol1->size[1]; i++) {
+          buffer[i*4+0] = vol1->materialColors.at(data[0])->blue();
+          buffer[i*4+1] = vol1->materialColors.at(data[0])->green();
+          buffer[i*4+2] = vol1->materialColors.at(data[0])->red();
           buffer[i*4+3] = data[0]==0?0:alpha;
           data++;
+        }
+        break;
       }
-      break;
-  }
-  default: {
-        fprintf(stderr, "Error: this type is not allowed for label fields...");
-      }
-  }
-  return buffer;
-}
-
-// create a label field from the volume
-unsigned char * MainWindow::fillBuffer1FromHBuffer(int pos, ScalarVolume *vol1, float alpha) {
-
-  if ((ulong)lab1->size[0]* lab1->size[1] * lab1->size[2] !=
-      hbuffer.size()) {
-    fprintf(stderr, "Error: hbuffer does not have same size as volume");
-    return NULL;
-  }
-  int numBytes = MyPrimType::getTypeSize(vol1->dataType);
-  long offset = pos*(vol1->size[0]*vol1->size[1])*numBytes;
-
-  // create a correct buffer for the image (ARGB32)
-  unsigned char *d = vol1->dataPtr + offset;
-  unsigned char *buffer = (unsigned char*)malloc(4 * vol1->size[0] * vol1->size[1]);
-  switch(vol1->dataType) {
-  case MyPrimType::UCHAR :
-  case MyPrimType::CHAR : {
-      for (long i = 0; i < (long)vol1->size[0]*vol1->size[1]; i++) {
-          buffer[i*4+0] = 0; // blue
-          buffer[i*4+1] = 0; // green
-          buffer[i*4+2] = (int)hbuffer[i+offset] * 255; // red
-          buffer[i*4+3] = !hbuffer[i+offset]?0:alpha; // alpha (0..254)
-      }
-      break;
-  }
-  case MyPrimType::SHORT : {
-      for (long i = 0; i < (long)vol1->size[0]*vol1->size[1]; i++) {
-          buffer[i*4+0] = 0;
-          buffer[i*4+1] = 0;
-          buffer[i*4+2] = (int)hbuffer[i+offset] * 255;
-          buffer[i*4+3] = !hbuffer[i+offset]?0:alpha;
-      }
-      break;
-  }
-  case MyPrimType::USHORT : {
-      for (long i = 0; i < (long)vol1->size[0]*vol1->size[1]; i++) {
-          buffer[i*4+0] = 0;
-          buffer[i*4+1] = 0;
-          buffer[i*4+2] = (int)hbuffer[i+offset] * 255;
-          buffer[i*4+3] = !hbuffer[i+offset]?0:alpha;
-      }
-      break;
-  }
-  case MyPrimType::INT : {
-      for (long i = 0; i < (long)vol1->size[0]*vol1->size[1]; i++) {
-          buffer[i*4+0] = 0;
-          buffer[i*4+1] = 0;
-          buffer[i*4+2] = (int)hbuffer[i+offset] * 255;
-          buffer[i*4+3] = !hbuffer[i+offset]?0:alpha;
-      }
-      break;
-  }
-  case MyPrimType::UINT : {
-      for (long i = 0; i < (long)vol1->size[0]*vol1->size[1]; i++) {
-          buffer[i*4+0] = 0;
-          buffer[i*4+1] = 0;
-          buffer[i*4+2] = (int)hbuffer[i+offset] * 255;
-          buffer[i*4+3] = !hbuffer[i+offset]?0:alpha;
-      }
-      break;
-  }
-  default: {
+    default: {
         fprintf(stderr, "Error: this type is not allowed for label fields...");
       }
   }
@@ -1030,96 +2661,171 @@ unsigned char *MainWindow::fillBuffer2(int pos, Volume *vol1, float alpha) {
 }
 
 unsigned char *MainWindow::fillBuffer2AsColor(int pos, ScalarVolume *vol1, float alpha) {
-    // create a correct buffer for the image (ARGB32)
-    unsigned char *d = vol1->dataPtr;
-    unsigned char *buffer = (unsigned char*)malloc(4 * vol1->size[0] * vol1->size[2]);
-    switch(vol1->dataType) {
+  // create a correct buffer for the image (ARGB32)
+  unsigned char *d = vol1->dataPtr;
+  unsigned char *buffer = (unsigned char*)malloc(4 * vol1->size[0] * vol1->size[2]);
+  switch(vol1->dataType) {
     case MyPrimType::UCHAR :
     case MyPrimType::CHAR : {
         unsigned char *data = (unsigned char *)d;
         long count = 0;
         for (long j = 0; j < vol1->size[2]; j++) {
-            for (long i = 0; i < vol1->size[0]; i++) {
-                data = (unsigned char *)d;
-                data += j*(vol1->size[0]*vol1->size[1])+pos*vol1->size[0]+i;
-                buffer[count*4+0] = vol1->materialColors.at(data[0]).blue();
-                buffer[count*4+1] = vol1->materialColors.at(data[0]).green();
-                buffer[count*4+2] = vol1->materialColors.at(data[0]).red();
-                buffer[count*4+3] = data[0]==0?0:alpha;
-                count++;
-            }
+          for (long i = 0; i < vol1->size[0]; i++) {
+            data = (unsigned char *)d;
+            data += j*(vol1->size[0]*vol1->size[1])+pos*vol1->size[0]+i;
+            buffer[count*4+0] = vol1->materialColors.at(data[0])->blue();
+            buffer[count*4+1] = vol1->materialColors.at(data[0])->green();
+            buffer[count*4+2] = vol1->materialColors.at(data[0])->red();
+            buffer[count*4+3] = data[0]==0?0:alpha;
+            count++;
+          }
         }
         break;
-    }
+      }
     case MyPrimType::SHORT : {
         signed short *data = (signed short *)d;
         long count = 0;
         for (long j = 0; j < vol1->size[2]; j++) {
-            for (long i = 0; i < vol1->size[0]; i++) {
-                data = (signed short *)d;
-                data += j*(vol1->size[0]*vol1->size[1])+pos*vol1->size[0]+i;
-                buffer[count*4+0] = vol1->materialColors.at(data[0]).blue();
-                buffer[count*4+1] = vol1->materialColors.at(data[0]).green();
-                buffer[count*4+2] = vol1->materialColors.at(data[0]).red();
-                buffer[count*4+3] = data[0]==0?0:alpha;
-                count++;
-            }
+          for (long i = 0; i < vol1->size[0]; i++) {
+            data = (signed short *)d;
+            data += j*(vol1->size[0]*vol1->size[1])+pos*vol1->size[0]+i;
+            buffer[count*4+0] = vol1->materialColors.at(data[0])->blue();
+            buffer[count*4+1] = vol1->materialColors.at(data[0])->green();
+            buffer[count*4+2] = vol1->materialColors.at(data[0])->red();
+            buffer[count*4+3] = data[0]==0?0:alpha;
+            count++;
+          }
         }
         break;
-    }
+      }
     case MyPrimType::USHORT : {
         unsigned short *data = (unsigned short *)d;
         long count = 0;
         for (long j = 0; j < vol1->size[2]; j++) {
-            for (long i = 0; i < vol1->size[0]; i++) {
-                data = (unsigned short *)d;
-                data += j*(vol1->size[0]*vol1->size[1])+pos*vol1->size[0]+i;
-                buffer[count*4+0] = vol1->materialColors.at(data[0]).blue();
-                buffer[count*4+1] = vol1->materialColors.at(data[0]).green();
-                buffer[count*4+2] = vol1->materialColors.at(data[0]).red();
-                buffer[count*4+3] = data[0]==0?0:alpha;
-                count++;
-            }
+          for (long i = 0; i < vol1->size[0]; i++) {
+            data = (unsigned short *)d;
+            data += j*(vol1->size[0]*vol1->size[1])+pos*vol1->size[0]+i;
+            buffer[count*4+0] = vol1->materialColors.at(data[0])->blue();
+            buffer[count*4+1] = vol1->materialColors.at(data[0])->green();
+            buffer[count*4+2] = vol1->materialColors.at(data[0])->red();
+            buffer[count*4+3] = data[0]==0?0:alpha;
+            count++;
+          }
         }
         break;
-    }
+      }
     case MyPrimType::INT : {
         signed int *data = (signed int *)d;
         long count = 0;
         for (long j = 0; j < vol1->size[2]; j++) {
-            for (long i = 0; i < vol1->size[0]; i++) {
-                data = (int *)d;
-                data += j*(vol1->size[0]*vol1->size[1])+pos*vol1->size[0]+i;
-                buffer[count*4+0] = vol1->materialColors.at(data[0]).blue();
-                buffer[count*4+1] = vol1->materialColors.at(data[0]).green();
-                buffer[count*4+2] = vol1->materialColors.at(data[0]).red();
-                buffer[count*4+3] = data[0]==0?0:alpha;
-                count++;
-            }
+          for (long i = 0; i < vol1->size[0]; i++) {
+            data = (int *)d;
+            data += j*(vol1->size[0]*vol1->size[1])+pos*vol1->size[0]+i;
+            buffer[count*4+0] = vol1->materialColors.at(data[0])->blue();
+            buffer[count*4+1] = vol1->materialColors.at(data[0])->green();
+            buffer[count*4+2] = vol1->materialColors.at(data[0])->red();
+            buffer[count*4+3] = data[0]==0?0:alpha;
+            count++;
+          }
         }
         break;
-    }
+      }
     case MyPrimType::UINT : {
         unsigned int *data = (unsigned int *)d;
         long count = 0;
         for (long j = 0; j < vol1->size[2]; j++) {
-            for (long i = 0; i < vol1->size[0]; i++) {
-                data = (unsigned int *)d;
-                data += j*(vol1->size[0]*vol1->size[1])+pos*vol1->size[0]+i;
-                buffer[count*4+0] = vol1->materialColors.at(data[0]).blue();
-                buffer[count*4+1] = vol1->materialColors.at(data[0]).green();
-                buffer[count*4+2] = vol1->materialColors.at(data[0]).red();
-                buffer[count*4+3] = data[0]==0?0:alpha;
-                count++;
-            }
+          for (long i = 0; i < vol1->size[0]; i++) {
+            data = (unsigned int *)d;
+            data += j*(vol1->size[0]*vol1->size[1])+pos*vol1->size[0]+i;
+            buffer[count*4+0] = vol1->materialColors.at(data[0])->blue();
+            buffer[count*4+1] = vol1->materialColors.at(data[0])->green();
+            buffer[count*4+2] = vol1->materialColors.at(data[0])->red();
+            buffer[count*4+3] = data[0]==0?0:alpha;
+            count++;
+          }
         }
         break;
-    }
+      }
     default: {
-          fprintf(stderr, "Error: this type is not allowed as a label field");
+        fprintf(stderr, "Error: this type is not allowed as a label field");
+      }
+  }
+  return buffer;
+}
+
+
+// create a label field from the volume
+unsigned char * MainWindow::fillBuffer1FromHBuffer(int pos, ScalarVolume *vol1, float alpha) {
+
+  if ((ulong)lab1->size[0]* lab1->size[1] * lab1->size[2] !=
+      hbuffer.size()) {
+    fprintf(stderr, "Error: hbuffer does not have same size as volume");
+    return NULL;
+  }
+  int numBytes = MyPrimType::getTypeSize(vol1->dataType);
+  long offset = pos*(vol1->size[0]*vol1->size[1])*numBytes;
+
+  // create a correct buffer for the image (ARGB32)
+  unsigned char *buffer = (unsigned char*)malloc(4 * vol1->size[0] * vol1->size[1]);
+
+  for (long i = 0; i < (long)vol1->size[0]*vol1->size[1]; i++) {
+    buffer[i*4+0] = 0; // blue
+    buffer[i*4+1] = 0; // green
+    buffer[i*4+2] = (int)hbuffer[i+offset] * 255; // red
+    buffer[i*4+3] = !hbuffer[i+offset]?0:alpha; // alpha (0..254)
+  }
+
+  return buffer;
+}
+
+// create a label field from the volume
+unsigned char * MainWindow::fillBuffer2FromHBuffer(int pos, ScalarVolume *vol1, float alpha) {
+
+  if ((ulong)lab1->size[0]* lab1->size[1] * lab1->size[2] !=
+      hbuffer.size()) {
+    fprintf(stderr, "Error: hbuffer does not have same size as volume");
+    return NULL;
+  }
+  // create a correct buffer for the image (ARGB32)
+  unsigned char *buffer = (unsigned char*)malloc(4 * vol1->size[0] * vol1->size[2]);
+
+  for (int j = 0; j < vol1->size[2]; j++) {
+    for (int i = 0; i < vol1->size[0]; i++) {
+      ulong idx = j*(vol1->size[0]*vol1->size[1])+pos*vol1->size[0]+i;
+      ulong idx2 = j*vol1->size[0]+i;
+      buffer[idx2*4+0] = 0; // blue
+      buffer[idx2*4+1] = 0; // green
+      buffer[idx2*4+2] = (int)hbuffer[idx] * 255; // red
+      buffer[idx2*4+3] = !hbuffer[idx]?0:alpha; // alpha (0..254)
     }
+  }
+  return buffer;
+}
+
+// create a label field from the volume
+unsigned char * MainWindow::fillBuffer3FromHBuffer(int pos, ScalarVolume *vol1, float alpha) {
+
+  if ((ulong)lab1->size[0]* lab1->size[1] * lab1->size[2] !=
+      hbuffer.size()) {
+    fprintf(stderr, "Error: hbuffer does not have same size as volume");
+    return NULL;
+  }
+
+  // create a correct buffer for the image (ARGB32)
+  unsigned char *buffer = (unsigned char*)malloc(4 * vol1->size[1] * vol1->size[2]);
+
+  // todo: use loop over bitfield instead
+  for (int j = 0; j < vol1->size[2]; j++) {
+    for (int i = 0; i < vol1->size[1]; i++) {
+      ulong idx = j*(vol1->size[0]*vol1->size[1])+i*vol1->size[0]+pos;
+      ulong idx2 = j*vol1->size[1]+i;
+      buffer[idx2*4+0] = 0; // blue
+      buffer[idx2*4+1] = 0; // green
+      buffer[idx2*4+2] = (int)hbuffer[idx] * 255; // red
+      buffer[idx2*4+3] = !hbuffer[idx]?0:alpha; // alpha (0..254)
     }
-    return buffer;
+  }
+  return buffer;
 }
 
 unsigned char *MainWindow::fillBuffer3(int pos, Volume *vol1, float alpha) {
@@ -1324,88 +3030,88 @@ unsigned char *MainWindow::fillBuffer3AsColor(int pos, ScalarVolume *vol1, float
   unsigned char *d = vol1->dataPtr;
   unsigned char *buffer = (unsigned char*)malloc(4 * vol1->size[1] * vol1->size[2]);
   switch(vol1->dataType) {
-  case MyPrimType::UCHAR :
-  case MyPrimType::CHAR : {
-      unsigned char *data = (unsigned char *)d;
-      long count = 0;
-      for (long j = 0; j < vol1->size[2]; j++) {
+    case MyPrimType::UCHAR :
+    case MyPrimType::CHAR : {
+        unsigned char *data = (unsigned char *)d;
+        long count = 0;
+        for (long j = 0; j < vol1->size[2]; j++) {
           for (long i = 0; i < vol1->size[1]; i++) {
-              data = (unsigned char *)d;
-              data += j*(vol1->size[0]*vol1->size[1])+i*vol1->size[0]+pos;
-              buffer[count*4+0] = vol1->materialColors.at(data[0]).blue();
-              buffer[count*4+1] = vol1->materialColors.at(data[0]).green();
-              buffer[count*4+2] = vol1->materialColors.at(data[0]).red();
-              buffer[count*4+3] = data[0]==0?0:alpha;
-              count++;
+            data = (unsigned char *)d;
+            data += j*(vol1->size[0]*vol1->size[1])+i*vol1->size[0]+pos;
+            buffer[count*4+0] = vol1->materialColors.at(data[0])->blue();
+            buffer[count*4+1] = vol1->materialColors.at(data[0])->green();
+            buffer[count*4+2] = vol1->materialColors.at(data[0])->red();
+            buffer[count*4+3] = data[0]==0?0:alpha;
+            count++;
           }
+        }
+        break;
       }
-      break;
-  }
-  case MyPrimType::SHORT : {
-      signed short *data = (signed short *)d;
-      long count = 0;
-      for (long j = 0; j < vol1->size[2]; j++) {
+    case MyPrimType::SHORT : {
+        signed short *data = (signed short *)d;
+        long count = 0;
+        for (long j = 0; j < vol1->size[2]; j++) {
           for (long i = 0; i < vol1->size[0]; i++) {
-              data = (signed short *)d;
-              data += j*(vol1->size[0]*vol1->size[1])+i*vol1->size[0]+pos;
-              buffer[count*4+0] = vol1->materialColors.at(data[0]).blue();
-              buffer[count*4+1] = vol1->materialColors.at(data[0]).green();
-              buffer[count*4+2] = vol1->materialColors.at(data[0]).red();
-              buffer[count*4+3] = data[0]==0?0:alpha;
-              count++;
+            data = (signed short *)d;
+            data += j*(vol1->size[0]*vol1->size[1])+i*vol1->size[0]+pos;
+            buffer[count*4+0] = vol1->materialColors.at(data[0])->blue();
+            buffer[count*4+1] = vol1->materialColors.at(data[0])->green();
+            buffer[count*4+2] = vol1->materialColors.at(data[0])->red();
+            buffer[count*4+3] = data[0]==0?0:alpha;
+            count++;
           }
+        }
+        break;
       }
-      break;
-  }
-  case MyPrimType::USHORT : {
-      unsigned short *data = (unsigned short *)d;
-      long count = 0;
-      for (long j = 0; j < vol1->size[2]; j++) {
+    case MyPrimType::USHORT : {
+        unsigned short *data = (unsigned short *)d;
+        long count = 0;
+        for (long j = 0; j < vol1->size[2]; j++) {
           for (long i = 0; i < vol1->size[0]; i++) {
-              data = (unsigned short *)d;
-              data += j*(vol1->size[0]*vol1->size[1])+i*vol1->size[0]+pos;
-              buffer[count*4+0] = vol1->materialColors.at(data[0]).blue();
-              buffer[count*4+1] = vol1->materialColors.at(data[0]).green();
-              buffer[count*4+2] = vol1->materialColors.at(data[0]).red();
-              buffer[count*4+3] = data[0]==0?0:alpha;
-              count++;
+            data = (unsigned short *)d;
+            data += j*(vol1->size[0]*vol1->size[1])+i*vol1->size[0]+pos;
+            buffer[count*4+0] = vol1->materialColors.at(data[0])->blue();
+            buffer[count*4+1] = vol1->materialColors.at(data[0])->green();
+            buffer[count*4+2] = vol1->materialColors.at(data[0])->red();
+            buffer[count*4+3] = data[0]==0?0:alpha;
+            count++;
           }
+        }
+        break;
       }
-      break;
-  }
-  case MyPrimType::INT : {
-      signed int *data = (signed int *)d;
-      long count = 0;
-      for (long j = 0; j < vol1->size[2]; j++) {
+    case MyPrimType::INT : {
+        signed int *data = (signed int *)d;
+        long count = 0;
+        for (long j = 0; j < vol1->size[2]; j++) {
           for (long i = 0; i < vol1->size[0]; i++) {
-              data = (int *)d;
-              data += j*(vol1->size[0]*vol1->size[1])+i*vol1->size[0]+pos;
-              buffer[count*4+0] = vol1->materialColors.at(data[0]).blue();
-              buffer[count*4+1] = vol1->materialColors.at(data[0]).green();
-              buffer[count*4+2] = vol1->materialColors.at(data[0]).red();
-              buffer[count*4+3] = data[0]==0?0:alpha;
-              count++;
+            data = (int *)d;
+            data += j*(vol1->size[0]*vol1->size[1])+i*vol1->size[0]+pos;
+            buffer[count*4+0] = vol1->materialColors.at(data[0])->blue();
+            buffer[count*4+1] = vol1->materialColors.at(data[0])->green();
+            buffer[count*4+2] = vol1->materialColors.at(data[0])->red();
+            buffer[count*4+3] = data[0]==0?0:alpha;
+            count++;
           }
+        }
+        break;
       }
-      break;
-  }
-  case MyPrimType::UINT : {
-      unsigned int *data = (unsigned int *)d;
-      long count = 0;
-      for (long j = 0; j < vol1->size[2]; j++) {
+    case MyPrimType::UINT : {
+        unsigned int *data = (unsigned int *)d;
+        long count = 0;
+        for (long j = 0; j < vol1->size[2]; j++) {
           for (long i = 0; i < vol1->size[0]; i++) {
-              data = (unsigned int *)d;
-              data += j*(vol1->size[0]*vol1->size[1])+i*vol1->size[0]+pos;
-              buffer[count*4+0] = vol1->materialColors.at(data[0]).blue();
-              buffer[count*4+1] = vol1->materialColors.at(data[0]).green();
-              buffer[count*4+2] = vol1->materialColors.at(data[0]).red();
-              buffer[count*4+3] = data[0]==0?0:alpha;
-              count++;
+            data = (unsigned int *)d;
+            data += j*(vol1->size[0]*vol1->size[1])+i*vol1->size[0]+pos;
+            buffer[count*4+0] = vol1->materialColors.at(data[0])->blue();
+            buffer[count*4+1] = vol1->materialColors.at(data[0])->green();
+            buffer[count*4+2] = vol1->materialColors.at(data[0])->red();
+            buffer[count*4+3] = data[0]==0?0:alpha;
+            count++;
           }
+        }
+        break;
       }
-      break;
-  }
-default: {
+    default: {
         fprintf(stderr, "Error: this data type is not supported as a label");
       }
   }
@@ -1428,26 +3134,32 @@ void MainWindow::updateImage1(int pos) {
     buffer = fillBuffer1FromHBuffer(pos, (ScalarVolume *)lab1, 180);
     QImage imageHBuffer1(buffer, lab1->size[0], lab1->size[1], QImage::Format_ARGB32);
 
-    QPainter::CompositionMode mode = QPainter::CompositionMode_Overlay;
+    // QPainter::CompositionMode mode = QPainter::CompositionMode_Overlay;
+    QPainter::CompositionMode mode = QPainter::CompositionMode_SourceOver;
 
     QPainter painter(&resultImage);
     painter.setRenderHint(QPainter::SmoothPixmapTransform, false);
+    painter.setRenderHint(QPainter::Antialiasing, false);
+    painter.setRenderHint(QPainter::TextAntialiasing, false);
+
     painter.setCompositionMode(QPainter::CompositionMode_Source);
     painter.fillRect(resultImage.rect(), Qt::transparent);
     painter.setCompositionMode(QPainter::CompositionMode_SourceOver);
     painter.drawImage(0, 0, imageVol1);
-    painter.setCompositionMode(mode);
-    painter.drawImage(0, 0, imageLab1);
-    painter.setCompositionMode(QPainter::CompositionMode_SourceOver);
-    painter.drawImage(0, 0, imageHBuffer1);
+    if (showHighlights) {
+      painter.setCompositionMode(mode);
+      painter.drawImage(0, 0, imageLab1);
+      painter.setCompositionMode(QPainter::CompositionMode_SourceOver);
+      painter.drawImage(0, 0, imageHBuffer1);
+    }
     painter.setCompositionMode(QPainter::CompositionMode_DestinationOver);
     painter.fillRect(resultImage.rect(), Qt::white);
     painter.end();
   }
   //http://harmattan-dev.nokia.com/docs/library/html/qt4/painting-imagecomposition.html
 
-  ui->Image1->setPixmap(QPixmap::fromImage(resultImage));
-  ui->scrollArea_4->setWidgetResizable(true);
+  Image1->setPixmap(QPixmap::fromImage(resultImage));
+  ui->scrollArea_4->setWidgetResizable(false);
 }
 
 
@@ -1462,84 +3174,96 @@ void MainWindow::updateImage2(int pos) { // [x, 0, z]
     buffer = fillBuffer2AsColor(pos, (ScalarVolume *)lab1, 128);
     QImage imageLab1(buffer, lab1->size[0], lab1->size[2], QImage::Format_ARGB32);
 
-    QPainter::CompositionMode mode = QPainter::CompositionMode_Overlay;
+    buffer = fillBuffer2FromHBuffer(pos, (ScalarVolume *)lab1, 180);
+    QImage imageHBuffer2(buffer, lab1->size[0], lab1->size[2], QImage::Format_ARGB32);
+
+    //QPainter::CompositionMode mode = QPainter::CompositionMode_Overlay;
+    QPainter::CompositionMode mode = QPainter::CompositionMode_SourceOver;
 
     QPainter painter(&resultImage);
     painter.setCompositionMode(QPainter::CompositionMode_Source);
     painter.fillRect(resultImage.rect(), Qt::transparent);
     painter.setCompositionMode(QPainter::CompositionMode_SourceOver);
     painter.drawImage(0, 0, imageVol1);
-    painter.setCompositionMode(mode);
-    painter.drawImage(0, 0, imageLab1);
+    if (showHighlights) {
+      painter.setCompositionMode(mode);
+      painter.drawImage(0, 0, imageLab1);
+      painter.setCompositionMode(QPainter::CompositionMode_SourceOver);
+      painter.drawImage(0, 0, imageHBuffer2);
+    }
     painter.setCompositionMode(QPainter::CompositionMode_DestinationOver);
     painter.fillRect(resultImage.rect(), Qt::white);
     painter.end();
   }
   //http://harmattan-dev.nokia.com/docs/library/html/qt4/painting-imagecomposition.html
 
-  ui->Image2->setPixmap(QPixmap::fromImage(resultImage));
-  ui->scrollArea_2->setWidgetResizable(true);
+  Image2->setPixmap(QPixmap::fromImage(resultImage));
+  ui->scrollArea_2->setWidgetResizable(false);
 
 }
 
 void MainWindow::updateImage3(int pos) { // [0, y, z]
 
-    unsigned char *buffer = fillBuffer3(pos, vol1, 255);
-    QImage imageVol1(buffer, vol1->size[1], vol1->size[2], QImage::Format_ARGB32);
-    QImage resultImage(imageVol1);
+  unsigned char *buffer = fillBuffer3(pos, vol1, 255);
+  QImage imageVol1(buffer, vol1->size[1], vol1->size[2], QImage::Format_ARGB32);
+  QImage resultImage(imageVol1);
 
-    if (lab1 != NULL && lab1->elementLength == 1) {
-      buffer = fillBuffer3AsColor(pos, (ScalarVolume *)lab1, 128);
-      QImage imageLab1(buffer, lab1->size[1], lab1->size[2], QImage::Format_ARGB32);
+  if (lab1 != NULL && lab1->elementLength == 1) {
+    buffer = fillBuffer3AsColor(pos, (ScalarVolume *)lab1, 128);
+    QImage imageLab1(buffer, lab1->size[1], lab1->size[2], QImage::Format_ARGB32);
 
-      QPainter::CompositionMode mode = QPainter::CompositionMode_Overlay;
+    buffer = fillBuffer3FromHBuffer(pos, (ScalarVolume *)lab1, 180);
+    QImage imageHBuffer3(buffer, lab1->size[1], lab1->size[2], QImage::Format_ARGB32);
 
-      QPainter painter(&resultImage);
-      painter.setCompositionMode(QPainter::CompositionMode_Source);
-      painter.fillRect(resultImage.rect(), Qt::transparent);
-      painter.setCompositionMode(QPainter::CompositionMode_SourceOver);
-      painter.drawImage(0, 0, imageVol1);
+    // QPainter::CompositionMode mode = QPainter::CompositionMode_Overlay;
+    QPainter::CompositionMode mode = QPainter::CompositionMode_SourceOver;
+
+    QPainter painter(&resultImage);
+    painter.setCompositionMode(QPainter::CompositionMode_Source);
+    painter.fillRect(resultImage.rect(), Qt::transparent);
+    painter.setCompositionMode(QPainter::CompositionMode_SourceOver);
+    painter.drawImage(0, 0, imageVol1);
+    if (showHighlights) {
       painter.setCompositionMode(mode);
       painter.drawImage(0, 0, imageLab1);
-      painter.setCompositionMode(QPainter::CompositionMode_DestinationOver);
-      painter.fillRect(resultImage.rect(), Qt::white);
-      painter.end();
+      painter.setCompositionMode(QPainter::CompositionMode_SourceOver);
+      painter.drawImage(0, 0, imageHBuffer3);
     }
-    //http://harmattan-dev.nokia.com/docs/library/html/qt4/painting-imagecomposition.html
+    painter.setCompositionMode(QPainter::CompositionMode_DestinationOver);
+    painter.fillRect(resultImage.rect(), Qt::white);
+    painter.end();
+  }
+  //http://harmattan-dev.nokia.com/docs/library/html/qt4/painting-imagecomposition.html
 
-    ui->Image3->setPixmap(QPixmap::fromImage(resultImage));
-    ui->scrollArea_3->setWidgetResizable(true);
+  Image3->setPixmap(QPixmap::fromImage(resultImage));
+  ui->scrollArea_3->setWidgetResizable(false);
 }
 
 // zoom in
 void MainWindow::on_pushButton_3_clicked() {
-    scaleImage(1.25);
+  scaleImage(1.25);
 }
 
 void MainWindow::on_pushButton_4_clicked(){
-    scaleImage(0.8);
+  scaleImage(0.8);
 }
 
 // window level is on
 void MainWindow::on_toolButton_toggled(bool checked) {
   if (checked) {
-      toolWindowLevel = true;
-      toolSegmentation = false;
-    } else {
-      toolWindowLevel = false;
-      toolSegmentation = true;
-    }
+    currentTool = MainWindow::ContrastBrightness;
+  } else {
+    currentTool = MainWindow::None;
+  }
 }
 
 // segmentation on
 void MainWindow::on_toolButton_2_toggled(bool checked) {
   if (checked) {
-      toolWindowLevel = false;
-      toolSegmentation = true;
-    } else {
-      toolWindowLevel = false;
-      toolSegmentation = true;
-    }
+    currentTool = MainWindow::BrushTool;
+  } else {
+    currentTool = MainWindow::None;
+  }
 }
 
 // reset the buffer
@@ -1554,11 +3278,10 @@ void MainWindow::on_toolButton_3_clicked()
 void MainWindow::on_toolButton_4_clicked()
 {
   // what is the active materials index?
-  int index = ui->treeWidget->indexOfTopLevelItem(ui->treeWidget->currentItem());
   bool ok = false;
   QTreeWidgetItem *item = ui->treeWidget->currentItem();
   if (!item) {
-    fprintf(stderr, "Error: nothing selected");
+    fprintf(stderr, "Error: no material selected");
     return;
   }
   int materialIdx = item->text(1).toInt(&ok);
@@ -1581,4 +3304,103 @@ void MainWindow::on_toolButton_5_clicked()
   }
   hbuffer.reset();
   update();
+}
+
+// enable wand segmentation mode
+void MainWindow::on_toolButton_6_clicked()
+{
+  // activeTool = Tools::MagicWandTool;
+}
+
+void MainWindow::on_toolButton_6_toggled(bool checked)
+{
+  if (checked)
+    currentTool = MainWindow::MagicWandTool;
+  else
+    currentTool = MainWindow::None;
+}
+
+// Highlight/dehighlight material
+void MainWindow::on_pushButton_5_clicked()
+{
+  bool ok = false;
+  QTreeWidgetItem *item = ui->treeWidget->currentItem();
+  if (!item) {
+    fprintf(stderr, "Error: no material selected");
+    return;
+  }
+  int materialIdx = item->text(1).toInt(&ok);
+  if (ok) {
+    // if not shift reset buffer first
+    Qt::KeyboardModifiers keyMod = QApplication::keyboardModifiers();
+    bool isSHIFT = keyMod.testFlag(Qt::ShiftModifier);
+    if (!isSHIFT) {
+      hbuffer.reset();
+    }
+
+    // we want to add the currently highlighted material to the buffer
+    for (ulong i = 0; i < (ulong)lab1->size[0] * lab1->size[1] * lab1->size[2]; i++) {
+      if (lab1->dataPtr[i] == materialIdx)
+        hbuffer[i] = true;
+    }
+    update();
+  }
+
+}
+
+// change the zoom using the mouse
+void MainWindow::on_zoomToggle_toggled(bool checked)
+{
+  if (checked) {
+    currentTool = MainWindow::ZoomTool;
+  } else {
+    currentTool = MainWindow::None;
+  }
+}
+
+void MainWindow::closeEvent(QCloseEvent *event)
+{
+  if (1 /*userReallyWantsToQuit() */ ) {
+    QSettings settings;
+    settings.setValue("files/currentPath", currentPath.absolutePath());
+
+    event->accept();
+  } else {
+    event->ignore();
+  }
+}
+
+void MainWindow::on_treeWidget_itemChanged(QTreeWidgetItem *item, int column)
+{
+  if (!lab1) {
+    return;
+  }
+
+  // copy the change back to the lab1 structure
+  int idx = item->text(1).toInt();
+  QColor color = item->backgroundColor(2);
+  QString name = item->text(0);
+  if (idx < lab1->materialNames.size()) { // material exists, so change it, if it does not exist, wait
+    lab1->materialNames[idx] = name;
+    lab1->materialColors[idx] = new QColor(color);
+  }
+}
+
+//double click on tree list item, start editing color
+void MainWindow::on_treeWidget_itemDoubleClicked(QTreeWidgetItem *item, int column)
+{
+  if (column == 2) {
+     QColor old = item->backgroundColor(2);
+     QColor color = QColorDialog::getColor(old);
+     item->setBackground(2, QBrush(color));
+  }
+}
+
+// this function is only called on already existing entries in the tree
+void MainWindow::on_treeWidget_doubleClicked(const QModelIndex &index)
+{
+    // user double-clicked on an empty entry, what is the index?
+//  if (index.isValid()) {
+//    on_pushButton_clicked();
+//  }
 }

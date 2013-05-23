@@ -11,6 +11,8 @@
 #include <QMouseEvent>
 #include <QGraphicsView>
 #include <QEvent>
+#include <QSettings>
+#include <QtNetwork/QNetworkAccessManager>
 
 #include <boost/dynamic_bitset.hpp>
 
@@ -28,18 +30,18 @@ public:
     explicit MainWindow(QWidget *parent = 0);
     ~MainWindow();
 
-    void mouseEvent(QObject *object, QMouseEvent *mouseEvent);
-    void myKeyPressEvent(QObject *object, QKeyEvent *keyEvent);
+    bool mouseEvent(QObject *object, QMouseEvent *mouseEvent);
+    bool myKeyPressEvent(QObject *object, QKeyEvent *keyEvent);
     void myMouseReleaseEvent (QObject *object, QMouseEvent * e);
     void myMousePressEvent (QObject *object, QMouseEvent * e);
-    void myMouseWheelEvent (QObject *object, QWheelEvent * e);
+    bool myMouseWheelEvent (QObject *object, QWheelEvent * e);
+    void myMouseButtonDblClick(QObject *object, QMouseEvent *mouseEvent);
 
 private slots:
     void on_pushButton_clicked();
 
     void on_pushButton_2_clicked();
 
-    void LoadImage();
     void LoadLabel();
     void SaveLabel();
     void CreateLabel();
@@ -61,6 +63,28 @@ private slots:
     // slice orientation indicates which slice to fill
     void FillHighlight(int which);
 
+    void on_toolButton_6_clicked();
+
+    void on_toolButton_6_toggled(bool checked);
+
+    void about();
+
+    void on_pushButton_5_clicked();
+
+    void on_zoomToggle_toggled(bool checked);
+
+    void on_treeWidget_itemChanged(QTreeWidgetItem *item, int column);
+
+    void on_treeWidget_itemDoubleClicked(QTreeWidgetItem *item, int column);
+
+    void finishedSlot(QNetworkReply* reply);
+
+    void on_treeWidget_doubleClicked(const QModelIndex &index);
+
+public slots:
+    void LoadImage();
+    void closeEvent(QCloseEvent *event);
+
 private:
     Ui::MainWindow *ui;
     double scaleFactor1;
@@ -81,12 +105,19 @@ private:
     void setupDefaultMaterials();
     void getMaterialsFromLabel();
 
+    std::vector<Volume *> volumes;
+    std::vector<Volume *> labels;
+
     Volume *vol1;
     Volume *lab1;
+    QLabel *Image1;
+    QLabel *Image2;
+    QLabel *Image3;
 
     std::vector<int> slicePosition;
     float windowLevel[2];
     float windowLevelOverlay[2];
+    // each dataset has also a currentWindowLevel, if you change windowLevel change that one as well
 
     void normalSize();
     void scaleImage(double factor);
@@ -95,6 +126,8 @@ private:
     int mousePressLocation[2];
     bool mouseIsDown;
     float windowLevelBefore[2];
+    float scaleFactor1Before;
+    float scaleFactor23Before;
     bool toolWindowLevel;
     bool toolSegmentation;
 
@@ -112,6 +145,28 @@ private:
     // create storage for the highlight
     // add buffer add and remove to currently hightlighted material
     boost::dynamic_bitset<> hbuffer;
+    void setHighlightBuffer(QObject *object, QMouseEvent *e);
+
+    enum Tools {
+      None,
+      ContrastBrightness,
+      BrushTool,
+      MagicWandTool,
+      ZoomTool
+    };
+
+    Tools currentTool;
+    int BrushToolRadius;
+    QDir currentPath;
+    void regionGrowing(int posx, int posy, int slice);
+    void regionGrowing2(int posx, int posy, int slice);
+    void regionGrowing3(int posx, int posy, int slice);
+
+    bool showHighlights;
+
+    // get a list of strings from internet
+    QNetworkAccessManager* nam;
+    QStringList fetchModel(QString aString);
 };
 
 #endif // MAINWINDOW_H

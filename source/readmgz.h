@@ -12,7 +12,7 @@ class ReadMGZ
 public:
     ReadMGZ(QString filename);
 
-    std::vector<ScalarVolume> *getVolume();
+    std::vector<ScalarVolume*> *getVolume();
     bool save(Volume *vol);
 
 private:

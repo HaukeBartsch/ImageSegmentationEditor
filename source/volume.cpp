@@ -14,7 +14,8 @@ ScalarVolume::ScalarVolume(std::vector<int> dims, MyPrimType type)
     materialNames.resize(1);
     materialNames[0] = QString("Exterior");
     materialColors.resize(1);
-    materialColors[0] = QColor(0,0,0);
+    materialColors[0] = new QColor(0,0,0);
+    filename = QString("empty");
 
     // create an empty volume
     this->size = dims;
@@ -208,7 +209,7 @@ void ScalarVolume::computeHist() {
       fs0 = true;
       step0 = i;
     }
-    if (!fs1 && val > 0.99) {
+    if (!fs1 && val > 0.999) {
       fs1 = true;
       step1 = i;
     }
@@ -222,6 +223,7 @@ ColorVolume *ScalarVolume::convertToColorVolume(ScalarVolume *red,
                                            ScalarVolume *blue,
                                            ScalarVolume *alpha) {
   ColorVolume *out = new ColorVolume(red->size, red->dataType);
+  out->filename = red->filename;
   if (!out) {
     fprintf(stderr, "Error: not enough memory to create color object");
     return NULL;
@@ -229,24 +231,25 @@ ColorVolume *ScalarVolume::convertToColorVolume(ScalarVolume *red,
   switch (red->dataType) {
     case MyPrimType::UCHAR : {
         // copy components over
-        unsigned char *o  = (unsigned char *)out->dataPtr;
-        unsigned char *cr = (unsigned char *)red->dataPtr;
-        unsigned char *cg = (unsigned char *)green->dataPtr;
-        unsigned char *cb = (unsigned char *)blue->dataPtr;
+        unsigned char *o  = (unsigned char *)(out->dataPtr);
+        unsigned char *cr = (unsigned char *)(red->dataPtr);
+        unsigned char *cg = (unsigned char *)(green->dataPtr);
+        unsigned char *cb = (unsigned char *)(blue->dataPtr);
         unsigned char *ca = NULL;
         if (alpha != NULL)
-          ca = (unsigned char *)alpha->dataPtr;
+          ca = (unsigned char *)(alpha->dataPtr);
 
         for (ulong i = 0; i < (ulong)red->size[0] * red->size[1] * red->size[2]; i++) {
           o[0] = cr[0];
-          //fprintf(stderr, "%d\n", (int)*cr);
+          //if (cr[0] > 0 || cg[0] > 0 || cb[0] > 0)
+          //  fprintf(stderr, "%d %d %d\n", cr[0], cg[0], cb[0]);
           o[1] = cg[0];
           o[2] = cb[0];
           if (alpha != NULL) {
             o[3] = ca[0];
             ca++;
           } else {
-            o[3] = 0;
+            o[3] = 128;
           }
           cr++; cg++; cb++; o+=4;
         }
@@ -400,8 +403,11 @@ ColorVolume *ScalarVolume::convertToColorVolume(ScalarVolume *red,
 
   out->updateRange();
   out->computeHist();
-  out->message = red->message;
-  out->loadCmd = red->loadCmd;
+  out->currentWindowLevel[0] = out->autoWindowLevel[0];
+  out->currentWindowLevel[1] = out->autoWindowLevel[1];
+  out->filename = red->filename;
+  out->message  = red->message;
+  out->loadCmd  = red->loadCmd;
 
   return out;
 }
@@ -437,7 +443,7 @@ ColorVolume::ColorVolume(std::vector<int> dims, MyPrimType type)
     materialNames.resize(1);
     materialNames[0] = QString("Exterior");
     materialColors.resize(1);
-    materialColors[0] = QColor(0,0,0);
+    materialColors[0] = new QColor(0,0,0);
 
     // create an empty volume
     this->size = dims;
@@ -712,8 +718,8 @@ void ColorVolume::computeHist() {
   float rangeCombined[2];
   rangeCombined[0] = (range[0] + range[2] + range[4])/3.0f;
   rangeCombined[1] = (range[1] + range[3] + range[5])/3.0f;
-  autoWindowLevel[0] = rangeCombined[0] + ((step0-0.0)/hist.size()/3.0) * (rangeCombined[1]-rangeCombined[0]); // set initial window level by 2..99 percent
-  autoWindowLevel[1] = rangeCombined[0] + ((step1-0.0)/hist.size()/3.0) * (rangeCombined[1]-rangeCombined[0]);
+  autoWindowLevel[0] = rangeCombined[0] + ((step0-0.0)/(hist.size()/3.0)) * (rangeCombined[1]-rangeCombined[0]); // set initial window level by 2..99 percent
+  autoWindowLevel[1] = rangeCombined[0] + ((step1-0.0)/(hist.size()/3.0)) * (rangeCombined[1]-rangeCombined[0]);
 }
 
 // flip a dimension
