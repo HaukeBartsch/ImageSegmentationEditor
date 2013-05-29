@@ -6,10 +6,13 @@
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QTextStream>
+#include <QGLWidget>
+#include <QGraphicsRectItem>
 #include <QtNetwork/QNetworkRequest>
 
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
+#include "undoredo.h"
 #include "readmgz.h"
 
 MainWindow::MainWindow(QWidget *parent) :
@@ -83,6 +86,8 @@ MainWindow::MainWindow(QWidget *parent) :
   nam = new QNetworkAccessManager(this);
   connect(nam, SIGNAL(finished(QNetworkReply*)),
               this, SLOT(finishedSlot(QNetworkReply*)));
+
+  firstUndoStepDone = false;
 }
 
 MainWindow::~MainWindow()
@@ -90,20 +95,90 @@ MainWindow::~MainWindow()
   delete ui;
 }
 
+void MainWindow::undo() {
+  bool doTwoSteps = false;
+  if (!firstUndoStepDone) { // we add the current state, so we can get back to it
+    UndoRedo::getInstance().add(&hbuffer, lab1);
+    firstUndoStepDone = true;
+    doTwoSteps = true;
+  }
+  bool ok = UndoRedo::getInstance().prev();
+  if (doTwoSteps) // we do a second prev to get over the current hump, something not right here still....
+    ok = UndoRedo::getInstance().prev();
+
+
+  if (ok) {
+    if (UndoRedo::getInstance().isBoth()) {
+      boost::dynamic_bitset<> *tmp = UndoRedo::getInstance().getBuffer();
+      if (tmp)
+        hbuffer = *tmp;
+      if (UndoRedo::getInstance().getVolume())
+        lab1 = UndoRedo::getInstance().getVolume();
+    } else if (UndoRedo::getInstance().isBuffer()) {
+      boost::dynamic_bitset<> *tmp = UndoRedo::getInstance().getBuffer();
+      if (tmp)
+        hbuffer = *tmp;
+    } else if (UndoRedo::getInstance().isVolume()) {
+      if (UndoRedo::getInstance().getVolume())
+        lab1 = UndoRedo::getInstance().getVolume();
+    }
+    update();
+  }
+}
+
+void MainWindow::redo() {
+  bool ok = UndoRedo::getInstance().next();
+
+  if (ok) {
+    if (UndoRedo::getInstance().isBoth()) {
+      boost::dynamic_bitset<> *tmp = UndoRedo::getInstance().getBuffer();
+      if (tmp)
+        hbuffer = *tmp;
+      if (UndoRedo::getInstance().getVolume())
+        lab1 = UndoRedo::getInstance().getVolume();
+    } else if (UndoRedo::getInstance().isBuffer()) {
+      boost::dynamic_bitset<> *tmp = UndoRedo::getInstance().getBuffer();
+      if (tmp)
+        hbuffer = *tmp;
+    } else if (UndoRedo::getInstance().isVolume()) {
+      if (UndoRedo::getInstance().getVolume())
+        lab1 = UndoRedo::getInstance().getVolume();
+    }
+    update();
+  }
+}
 
 bool MainWindow::myKeyPressEvent(QObject *object, QKeyEvent *keyEvent) {
+
+  bool isShift = QApplication::keyboardModifiers() & Qt::ShiftModifier;
+  bool isCtrl  = QApplication::keyboardModifiers() & Qt::ControlModifier;
+  if (keyEvent->key() == Qt::Key_Z && isCtrl) {
+    if (isShift)
+      redo();
+    else
+      undo();
+    keyEvent->accept();
+    return true;
+  }
 
   if (keyEvent->key() == Qt::Key_0 && (object == Image1 ||
                                        object == Image2 ||
                                        object == Image3)) {  // reset window level
+    if (!vol1) {
+      return false;
+    }
     windowLevel[0] = vol1->autoWindowLevel[0];
     windowLevel[1] = vol1->autoWindowLevel[1];
-    windowLevelOverlay[0] = lab1->autoWindowLevel[0];
-    windowLevelOverlay[1] = lab1->autoWindowLevel[1];
+    if (lab1) {
+      windowLevelOverlay[0] = lab1->autoWindowLevel[0];
+      windowLevelOverlay[1] = lab1->autoWindowLevel[1];
+    }
     vol1->currentWindowLevel[0] = windowLevel[0];
     vol1->currentWindowLevel[1] = windowLevel[1];
-    lab1->currentWindowLevel[0] = windowLevelOverlay[0];
-    lab1->currentWindowLevel[1] = windowLevelOverlay[1];
+    if (lab1) {
+      lab1->currentWindowLevel[0] = windowLevelOverlay[0];
+      lab1->currentWindowLevel[1] = windowLevelOverlay[1];
+    }
     update();
     keyEvent->accept();
     return true;
@@ -135,6 +210,7 @@ bool MainWindow::myKeyPressEvent(QObject *object, QKeyEvent *keyEvent) {
                                        object == Image3)) {
     on_toolButton_3_clicked();
     keyEvent->accept();
+
     return true;
   }
 
@@ -143,8 +219,6 @@ bool MainWindow::myKeyPressEvent(QObject *object, QKeyEvent *keyEvent) {
     return false;
   }
   keyEvent->accept();
-  bool isShift = QApplication::keyboardModifiers() & Qt::ShiftModifier;
-  bool isCtrl  = QApplication::keyboardModifiers() & Qt::ControlModifier;
 
   if (currentTool == MainWindow::BrushTool && keyEvent->key() == Qt::Key_0 && isShift)
     BrushToolRadius = 0;
@@ -162,6 +236,7 @@ bool MainWindow::myKeyPressEvent(QObject *object, QKeyEvent *keyEvent) {
       // restore window level
       windowLevel[0] = vol1->currentWindowLevel[0];
       windowLevel[1] = vol1->currentWindowLevel[1];
+      showHistogram(vol1, ui->windowLevelHistogram);
       update();
     }
   }
@@ -170,6 +245,7 @@ bool MainWindow::myKeyPressEvent(QObject *object, QKeyEvent *keyEvent) {
       vol1 = volumes[1];
       windowLevel[0] = vol1->currentWindowLevel[0];
       windowLevel[1] = vol1->currentWindowLevel[1];
+      showHistogram(vol1, ui->windowLevelHistogram);
       update();
     }
   }
@@ -178,6 +254,7 @@ bool MainWindow::myKeyPressEvent(QObject *object, QKeyEvent *keyEvent) {
       vol1 = volumes[2];
       windowLevel[0] = vol1->currentWindowLevel[0];
       windowLevel[1] = vol1->currentWindowLevel[1];
+      showHistogram(vol1, ui->windowLevelHistogram);
       update();
     }
   }
@@ -186,6 +263,7 @@ bool MainWindow::myKeyPressEvent(QObject *object, QKeyEvent *keyEvent) {
       vol1 = volumes[3];
       windowLevel[0] = vol1->currentWindowLevel[0];
       windowLevel[1] = vol1->currentWindowLevel[1];
+      showHistogram(vol1, ui->windowLevelHistogram);
       update();
     }
   }
@@ -194,6 +272,7 @@ bool MainWindow::myKeyPressEvent(QObject *object, QKeyEvent *keyEvent) {
       vol1 = volumes[4];
       windowLevel[0] = vol1->currentWindowLevel[0];
       windowLevel[1] = vol1->currentWindowLevel[1];
+      showHistogram(vol1, ui->windowLevelHistogram);
       update();
     }
   }
@@ -202,6 +281,7 @@ bool MainWindow::myKeyPressEvent(QObject *object, QKeyEvent *keyEvent) {
       vol1 = volumes[5];
       windowLevel[0] = vol1->currentWindowLevel[0];
       windowLevel[1] = vol1->currentWindowLevel[1];
+      showHistogram(vol1, ui->windowLevelHistogram);
       update();
     }
   }
@@ -210,6 +290,7 @@ bool MainWindow::myKeyPressEvent(QObject *object, QKeyEvent *keyEvent) {
       vol1 = volumes[6];
       windowLevel[0] = vol1->currentWindowLevel[0];
       windowLevel[1] = vol1->currentWindowLevel[1];
+      showHistogram(vol1, ui->windowLevelHistogram);
       update();
     }
   }
@@ -218,6 +299,7 @@ bool MainWindow::myKeyPressEvent(QObject *object, QKeyEvent *keyEvent) {
       vol1 = volumes[7];
       windowLevel[0] = vol1->currentWindowLevel[0];
       windowLevel[1] = vol1->currentWindowLevel[1];
+      showHistogram(vol1, ui->windowLevelHistogram);
       update();
     }
   }
@@ -226,6 +308,7 @@ bool MainWindow::myKeyPressEvent(QObject *object, QKeyEvent *keyEvent) {
       vol1 = volumes[8];
       windowLevel[0] = vol1->currentWindowLevel[0];
       windowLevel[1] = vol1->currentWindowLevel[1];
+      showHistogram(vol1, ui->windowLevelHistogram);
       update();
     }
   }
@@ -324,11 +407,28 @@ bool MainWindow::myKeyPressEvent(QObject *object, QKeyEvent *keyEvent) {
   return true;
 }
 
-void MainWindow::myMouseReleaseEvent ( QObject *object, QMouseEvent * e ) {
+bool MainWindow::myMouseReleaseEvent ( QObject *object, QMouseEvent * e ) {
   //fprintf(stderr, "Mouse was released at: %d %d", e->pos().x(), e->pos().y() );
   mouseIsDown = false;
-  if (currentTool == MainWindow::BrushTool)
+
+  if (object != Image1 && object != Image2 && object != Image3)
+    return false;
+
+  if (currentTool == MainWindow::BrushTool) {
     setHighlightBuffer(object, e);
+    // add to undo
+    UndoRedo::getInstance().add(&hbuffer);
+    firstUndoStepDone = false;
+    e->accept();
+    return true;
+  }
+  if (currentTool == MainWindow::MagicWandTool) {
+    e->accept();
+    UndoRedo::getInstance().add(&hbuffer);
+    firstUndoStepDone = false;
+    return true;
+  }
+  return false;
 }
 
 void MainWindow::myMousePressEvent ( QObject *object, QMouseEvent * e ) {
@@ -362,6 +462,8 @@ void MainWindow::myMousePressEvent ( QObject *object, QMouseEvent * e ) {
     regionGrowing3(posx, posy, slicePosition[0]);
     update();
   }
+  // add to undo
+  //UndoRedo::getInstance().add(&hbuffer);
 }
 
 void MainWindow::setHighlightBuffer(QObject *object, QMouseEvent *e) {
@@ -475,7 +577,8 @@ bool MainWindow::mouseEvent(QObject *object, QMouseEvent *e) {
     if (!lab1)
       return false;
     setHighlightBuffer(object, e);
-
+    // add to undo
+    //UndoRedo::getInstance().add(&hbuffer);
   } else if (mouseIsDown && currentTool == MainWindow::MagicWandTool) {
     // can be several tools create a brush first
     if (lab1 && object == Image1) {
@@ -498,7 +601,8 @@ bool MainWindow::mouseEvent(QObject *object, QMouseEvent *e) {
       regionGrowing3(posx, posy, slicePosition[0]);
       update();
     }
-
+    // add to undo
+    //UndoRedo::getInstance().add(&hbuffer);
   }
   return true;
 }
@@ -508,7 +612,7 @@ void MainWindow::regionGrowing(int posx, int posy, int slice) {
   if (!vol1 || posx < 0 || posx > vol1->size[0]-1 ||
       posy  < 0 || posy  > vol1->size[1]-1 ||
       slice < 0 || slice > vol1->size[2]-1 ||
-      hbuffer.size() != vol1->size[0]*vol1->size[1]*vol1->size[2])
+      hbuffer.size() != (size_t)vol1->size[0]*vol1->size[1]*vol1->size[2])
     return;
   float fuzzy = 0.2*fabs(windowLevel[1]-windowLevel[0])
       * 0.2*fabs(windowLevel[1]-windowLevel[0]);
@@ -518,7 +622,7 @@ void MainWindow::regionGrowing(int posx, int posy, int slice) {
   // either the current volume is a scalar or a color field
   if (vol1->elementLength == 1) {
 
-    boost::dynamic_bitset<ulong> done(vol1->size[0]*vol1->size[1]); // what was found
+    boost::dynamic_bitset<> done(vol1->size[0]*vol1->size[1]); // what was found
     std::vector<ulong> todo; // helper array to keep track what needs to be added
     switch(vol1->dataType) {
       case MyPrimType::UCHAR : {
@@ -862,7 +966,7 @@ void MainWindow::regionGrowing(int posx, int posy, int slice) {
     }
 
   } else if (vol1->elementLength == 4) {
-    boost::dynamic_bitset<ulong> done(vol1->size[0]*vol1->size[1]); // what was found
+    boost::dynamic_bitset<> done(vol1->size[0]*vol1->size[1]); // what was found
     std::vector<ulong> todo; // helper array to keep track what needs to be added
     switch(vol1->dataType) {
       case MyPrimType::UCHAR :
@@ -953,7 +1057,7 @@ void MainWindow::regionGrowing2(int posx, int posy, int slice) {  // slice is in
   if (!vol1 || posx < 0 || posx > vol1->size[0]-1 ||
       posy  < 0 || posy  > vol1->size[2]-1 ||
       slice < 0 || slice > vol1->size[1]-1 ||
-      hbuffer.size() != vol1->size[0]*vol1->size[1]*vol1->size[2])
+      hbuffer.size() != (size_t)vol1->size[0]*vol1->size[1]*vol1->size[2])
     return;
   float fuzzy = 0.2*fabs(windowLevel[1]-windowLevel[0])
       * 0.2*fabs(windowLevel[1]-windowLevel[0]);
@@ -962,7 +1066,7 @@ void MainWindow::regionGrowing2(int posx, int posy, int slice) {  // slice is in
   // either the current volume is a scalar or a color field
   if (vol1->elementLength == 1) {
 
-    boost::dynamic_bitset<ulong> done(vol1->size[0]*vol1->size[2]); // what was found
+    boost::dynamic_bitset<> done(vol1->size[0]*vol1->size[2]*vol1->size[1]); // what was found
     std::vector<ulong> todo; // helper array to keep track what needs to be added
     switch(vol1->dataType) {
       case MyPrimType::UCHAR : {
@@ -1143,7 +1247,7 @@ void MainWindow::regionGrowing2(int posx, int posy, int slice) {  // slice is in
         hbuffer[i] = !isCtrl;
     }
   } else if (vol1->elementLength == 4) {
-    boost::dynamic_bitset<ulong> done(vol1->size[0]*vol1->size[1]*vol1->size[2]); // what was found
+    boost::dynamic_bitset<> done(vol1->size[0]*vol1->size[1]*vol1->size[2]); // what was found
     std::vector<ulong> todo; // helper array to keep track what needs to be added
     switch(vol1->dataType) {
       case MyPrimType::UCHAR : {
@@ -1321,7 +1425,7 @@ void MainWindow::regionGrowing3(int posx, int posy, int slice) {  // slice is in
   // either the current volume is a scalar or a color field
   if (vol1->elementLength == 1) {
 
-    boost::dynamic_bitset<ulong> done(vol1->size[0]*vol1->size[1]*vol1->size[2]); // what was found
+    boost::dynamic_bitset<> done(vol1->size[0]*vol1->size[1]*vol1->size[2]); // what was found
     std::vector<ulong> todo; // helper array to keep track what needs to be added
     switch(vol1->dataType) {
       case MyPrimType::UCHAR : {
@@ -1335,7 +1439,7 @@ void MainWindow::regionGrowing3(int posx, int posy, int slice) {  // slice is in
             ulong here = todo.at(i);
             int y  = floor(here/(vol1->size[0]*vol1->size[1]));
             int x  = floor((here-(y*vol1->size[0]*vol1->size[1]))/vol1->size[0]);
-            int s  = here - (y*vol1->size[0]*vol1->size[1] + x * vol1->size[0]);
+            //int s  = here - (y*vol1->size[0]*vol1->size[1] + x * vol1->size[0]);
 
             ulong n1 = (y+1)*vol1->size[0]*vol1->size[1]+x*vol1->size[0]+slice;
             ulong n2 = (y-1)*vol1->size[0]*vol1->size[1]+x*vol1->size[0]+slice;
@@ -1391,7 +1495,7 @@ void MainWindow::regionGrowing3(int posx, int posy, int slice) {  // slice is in
             ulong here = todo.at(i);
             int y  = floor(here/(vol1->size[0]*vol1->size[1]));
             int x  = floor((here-(y*vol1->size[0]*vol1->size[1]))/vol1->size[0]);
-            int s  = here - (y*vol1->size[0]*vol1->size[1] + x * vol1->size[0]);
+            //int s  = here - (y*vol1->size[0]*vol1->size[1] + x * vol1->size[0]);
 
             ulong n1 = (y+1)*vol1->size[0]*vol1->size[1]+x*vol1->size[0]+slice;
             ulong n2 = (y-1)*vol1->size[0]*vol1->size[1]+x*vol1->size[0]+slice;
@@ -1447,7 +1551,7 @@ void MainWindow::regionGrowing3(int posx, int posy, int slice) {  // slice is in
             ulong here = todo.at(i);
             int y  = floor(here/(vol1->size[0]*vol1->size[1]));
             int x  = floor((here-(y*vol1->size[0]*vol1->size[1]))/vol1->size[0]);
-            int s  = here - (y*vol1->size[0]*vol1->size[1] + x * vol1->size[0]);
+            //int s  = here - (y*vol1->size[0]*vol1->size[1] + x * vol1->size[0]);
 
             ulong n1 = (y+1)*vol1->size[0]*vol1->size[1]+x*vol1->size[0]+slice;
             ulong n2 = (y-1)*vol1->size[0]*vol1->size[1]+x*vol1->size[0]+slice;
@@ -1502,7 +1606,7 @@ void MainWindow::regionGrowing3(int posx, int posy, int slice) {  // slice is in
         hbuffer[i] = !isCtrl;
     }
   } else if (vol1->elementLength == 4) {
-    boost::dynamic_bitset<ulong> done(vol1->size[0]*vol1->size[1]*vol1->size[2]); // what was found
+    boost::dynamic_bitset<> done(vol1->size[0]*vol1->size[1]*vol1->size[2]); // what was found
     std::vector<ulong> todo; // helper array to keep track what needs to be added
     switch(vol1->dataType) {
       case MyPrimType::UCHAR : {
@@ -1519,7 +1623,7 @@ void MainWindow::regionGrowing3(int posx, int posy, int slice) {  // slice is in
           ulong here = todo.at(i);
           int y  = floor(here/(vol1->size[0]*vol1->size[1]));
           int x  = floor((here-(y*vol1->size[0]*vol1->size[1]))/vol1->size[0]);
-          int s  = here - (y*vol1->size[0]*vol1->size[1] + x * vol1->size[0]);
+          //int s  = here - (y*vol1->size[0]*vol1->size[1] + x * vol1->size[0]);
 
           ulong n1 = (y+1)*vol1->size[0]*vol1->size[1]+x*vol1->size[0]+slice;
           ulong n2 = (y-1)*vol1->size[0]*vol1->size[1]+x*vol1->size[0]+slice;
@@ -1594,7 +1698,7 @@ void MainWindow::regionGrowing3(int posx, int posy, int slice) {  // slice is in
           ulong here = todo.at(i);
           int y  = floor(here/(vol1->size[0]*vol1->size[1]));
           int x  = floor((here-(y*vol1->size[0]*vol1->size[1]))/vol1->size[0]);
-          int s  = here - (y*vol1->size[0]*vol1->size[1] + x * vol1->size[0]);
+          //int s  = here - (y*vol1->size[0]*vol1->size[1] + x * vol1->size[0]);
 
           ulong n1 = (y+1)*vol1->size[0]*vol1->size[1]+x*vol1->size[0]+slice;
           ulong n2 = (y-1)*vol1->size[0]*vol1->size[1]+x*vol1->size[0]+slice;
@@ -1762,6 +1866,8 @@ void MainWindow::on_pushButton_clicked()
 {
   if (!lab1)
     CreateLabel();
+  if (!lab1)
+    return;
 
   int newMaterialIdx = ui->treeWidget->topLevelItemCount();
   QString name = QString("material%1").arg(newMaterialIdx);
@@ -1783,9 +1889,11 @@ void MainWindow::on_pushButton_clicked()
 void MainWindow::on_pushButton_2_clicked()
 {
   QTreeWidgetItem *item = ui->treeWidget->currentItem();
+  if (!item)
+    return;
   int idx = item->text(1).toInt();
   // remove material from label field as well
-  if (idx < lab1->materialNames.size()) {
+  if (idx < (int)lab1->materialNames.size()) {
     lab1->materialColors.erase(lab1->materialColors.begin()+idx);
     lab1->materialNames.erase(lab1->materialNames.begin()+idx);
   }
@@ -1894,7 +2002,9 @@ void MainWindow::LoadImage() {
     }
     if (found == false)
       volumes.push_back(vol1);
-    //showHistogram(vol1, ui->windowLevelHistogram);
+
+    ui->windowLevelHistogram->setViewport( new QGLWidget() ); // makes the graphics window much much faster
+    showHistogram(vol1, ui->windowLevelHistogram);
   }
 }
 
@@ -1903,34 +2013,56 @@ void MainWindow::showHistogram(Volume *vol1, QGraphicsView *gv) {
   if (vol1->hist.size() == 0)
     return; // nothing to do
 
-  int w = gv->width();
-  int h = gv->height();
+  int w = gv->viewport()->width();
+  int h = gv->viewport()->height();
 
-  ulong cumsum = 0;
+
+  double cumsum = 0;
   for (unsigned int i = 0; i < vol1->hist.size(); i++) {
-    cumsum += vol1->hist[i];
+    float val = vol1->hist[i];
+    cumsum += val;
   }
 
   std::vector<double> histTmp(vol1->hist.size(), 0.0);
   for (unsigned int i = 0; i < histTmp.size(); i++) {
-    histTmp[i] = log(vol1->hist[i]/(double)cumsum);
+    double v1 = (double)vol1->hist[i]/(double)cumsum;
+    double v3 = log(v1*200+1);
+    histTmp[i] = v3;
   }
-  double cumsum2 = 0.0;
+  double max = histTmp[0];
   for (unsigned int i = 0; i < histTmp.size(); i++) {
-    cumsum2 = histTmp[i];
+    if (max < histTmp[i])
+      max = histTmp[i];
   }
   for (unsigned int i = 0; i < histTmp.size(); i++) {
-    histTmp[i] = histTmp[i]/(double)cumsum2;
+    histTmp[i] = histTmp[i]/(double)max;
   }
 
   QGraphicsScene *scene = new QGraphicsScene();
   gv->setScene(scene);
-  float wi = w/(double)(vol1->hist.size()-1);
-  for (unsigned int i = 0; i < vol1->hist.size(); i+=3) {
-    float x   = i * wi;
-    float y   = h - (histTmp[i]*h);
-    float val = histTmp[i]*h;
-    scene->addRect(x, y, 3, val );
+  unsigned int nbars = vol1->hist.size()/vol1->elementLength;
+  float wi = w/(double)(nbars-1);
+  for (int channel = 0; channel < vol1->elementLength; channel++) {
+    for (unsigned int i = 0; i < nbars; i+=2) {
+      float x   = i * wi;
+      // float y   = histTmp[channel*vol1->hist.size()/vol1->elementLength+i]*h;
+      float val = 10*histTmp[channel*nbars+i]*h;
+      if (val > h)
+        val = h;
+      QGraphicsRectItem *item = new QGraphicsRectItem(x, h-val, 3, val);
+      if (vol1->elementLength>1) {
+        if (channel == 0)
+          item->setBrush(QBrush(Qt::red));
+        if (channel == 1)
+          item->setBrush(QBrush(Qt::green));
+        if (channel == 2)
+          item->setBrush(QBrush(Qt::blue));
+      } else {
+        item->setBrush(QBrush(Qt::gray));
+      }
+      item->setPen( QPen(Qt::NoPen) );
+      scene->addItem(item);
+    }
   }
   gv->setViewportUpdateMode(QGraphicsView::MinimalViewportUpdate);
   gv->setRenderHint(QPainter::Antialiasing, false);
@@ -1962,6 +2094,7 @@ void MainWindow::LoadLabel() {
 
   getMaterialsFromLabel();
   update();
+
 
   hbuffer.resize( (ulong)lab1->size[0] * lab1->size[1] * lab1->size[2] );
 
@@ -2013,6 +2146,9 @@ void MainWindow::LoadLabel() {
      getMaterialsFromLabel();
   }
 
+  // add to undo
+  UndoRedo::getInstance().add(&hbuffer, lab1);
+  firstUndoStepDone = false;
 }
 
 void MainWindow::SaveLabel() {
@@ -2040,8 +2176,8 @@ void MainWindow::SaveLabel() {
       material.insert(0, name);
       material.insert(1,index);
       QJsonArray c = QJsonArray();
-      int cc = color->red();
-      int cb = color->green();
+      //int cc = color->red();
+      //int cb = color->green();
       c.insert(0, color->red());
       c.insert(1, color->green());
       c.insert(2, color->blue());
@@ -2076,13 +2212,21 @@ void MainWindow::CreateLabel() {
                              tr("Load a volume first."));
     return;
   }
+
   lab1 = (Volume*)new ScalarVolume(vol1->size, MyPrimType::UCHAR);
   lab1->filename = QString("label created on ") + QDateTime::currentDateTime().toString();
   memset(lab1->dataPtr, 0, lab1->size[0]*lab1->size[1]*lab1->size[2]);
   lab1->range[0] = 0; lab1->range[1] = 0;
   lab1->computeHist();
   getMaterialsFromLabel();
+
   hbuffer.resize( (ulong)lab1->size[0] * lab1->size[1] * lab1->size[2] );
+
+  // add to undo
+  if (lab1) {
+    UndoRedo::getInstance().add(&hbuffer, lab1);
+    firstUndoStepDone = false;
+  }
 }
 
 void MainWindow::createActions() {
@@ -2113,6 +2257,10 @@ void MainWindow::FillHighlight(int which) {
   //fprintf(stderr, "fill in highlight");
   if (!hbuffer.size())
     return;
+
+  // add to (undo)
+  UndoRedo::getInstance().add(&hbuffer);
+  firstUndoStepDone = false;
 
   // use flood fill scanline method
   // start at the first voxel for the current slide
@@ -3122,17 +3270,19 @@ unsigned char *MainWindow::fillBuffer3AsColor(int pos, ScalarVolume *vol1, float
 
 void MainWindow::updateImage1(int pos) {
 
-  unsigned char *buffer = NULL;
-  buffer = fillBuffer1(pos, vol1, 255);
-  QImage imageVol1(buffer, vol1->size[0], vol1->size[1], QImage::Format_ARGB32);
+  unsigned char *buffer1 = NULL;
+  unsigned char *buffer2 = NULL;
+  unsigned char *buffer3 = NULL;
+  buffer1 = fillBuffer1(pos, vol1, 255);
+  QImage imageVol1(buffer1, vol1->size[0], vol1->size[1], QImage::Format_ARGB32);
   QImage resultImage(imageVol1); //  = QImage(imageVol1.size(), QImage::Format_ARGB32_Premultiplied);
 
   if (lab1 != NULL && lab1->elementLength == 1) {
-    buffer = fillBuffer1AsColor(pos, (ScalarVolume *)lab1, 180);
-    QImage imageLab1(buffer, lab1->size[0], lab1->size[1], QImage::Format_ARGB32);
+    buffer2 = fillBuffer1AsColor(pos, (ScalarVolume *)lab1, 180);
+    QImage imageLab1(buffer2, lab1->size[0], lab1->size[1], QImage::Format_ARGB32);
 
-    buffer = fillBuffer1FromHBuffer(pos, (ScalarVolume *)lab1, 180);
-    QImage imageHBuffer1(buffer, lab1->size[0], lab1->size[1], QImage::Format_ARGB32);
+    buffer3 = fillBuffer1FromHBuffer(pos, (ScalarVolume *)lab1, 180);
+    QImage imageHBuffer1(buffer3, lab1->size[0], lab1->size[1], QImage::Format_ARGB32);
 
     // QPainter::CompositionMode mode = QPainter::CompositionMode_Overlay;
     QPainter::CompositionMode mode = QPainter::CompositionMode_SourceOver;
@@ -3160,22 +3310,31 @@ void MainWindow::updateImage1(int pos) {
 
   Image1->setPixmap(QPixmap::fromImage(resultImage));
   ui->scrollArea_4->setWidgetResizable(false);
+  if (buffer1)
+    free(buffer1);
+  if (buffer2)
+    free(buffer2);
+  if (buffer3)
+    free(buffer3);
 }
 
 
 void MainWindow::updateImage2(int pos) { // [x, 0, z]
 
-  unsigned char *buffer = fillBuffer2(pos, vol1, 255);
-  QImage imageVol1(buffer, vol1->size[0], vol1->size[2], QImage::Format_ARGB32);
+  unsigned char *buffer1 = NULL;
+  unsigned char *buffer2 = NULL;
+  unsigned char *buffer3 = NULL;
+  buffer1 = fillBuffer2(pos, vol1, 255);
+  QImage imageVol1(buffer1, vol1->size[0], vol1->size[2], QImage::Format_ARGB32);
   QImage resultImage(imageVol1);
   // resultImage = QImage(imageVol1.size(), QImage::Format_ARGB32_Premultiplied);
 
   if (lab1 != NULL && lab1->elementLength == 1) {
-    buffer = fillBuffer2AsColor(pos, (ScalarVolume *)lab1, 128);
-    QImage imageLab1(buffer, lab1->size[0], lab1->size[2], QImage::Format_ARGB32);
+    buffer2 = fillBuffer2AsColor(pos, (ScalarVolume *)lab1, 128);
+    QImage imageLab1(buffer2, lab1->size[0], lab1->size[2], QImage::Format_ARGB32);
 
-    buffer = fillBuffer2FromHBuffer(pos, (ScalarVolume *)lab1, 180);
-    QImage imageHBuffer2(buffer, lab1->size[0], lab1->size[2], QImage::Format_ARGB32);
+    buffer3 = fillBuffer2FromHBuffer(pos, (ScalarVolume *)lab1, 180);
+    QImage imageHBuffer2(buffer3, lab1->size[0], lab1->size[2], QImage::Format_ARGB32);
 
     //QPainter::CompositionMode mode = QPainter::CompositionMode_Overlay;
     QPainter::CompositionMode mode = QPainter::CompositionMode_SourceOver;
@@ -3199,21 +3358,29 @@ void MainWindow::updateImage2(int pos) { // [x, 0, z]
 
   Image2->setPixmap(QPixmap::fromImage(resultImage));
   ui->scrollArea_2->setWidgetResizable(false);
-
+  if (buffer1)
+    free(buffer1);
+  if (buffer2)
+    free(buffer2);
+  if (buffer3)
+    free(buffer3);
 }
 
 void MainWindow::updateImage3(int pos) { // [0, y, z]
+  unsigned char *buffer1 = NULL;
+  unsigned char *buffer2 = NULL;
+  unsigned char *buffer3 = NULL;
 
-  unsigned char *buffer = fillBuffer3(pos, vol1, 255);
-  QImage imageVol1(buffer, vol1->size[1], vol1->size[2], QImage::Format_ARGB32);
+  buffer1 = fillBuffer3(pos, vol1, 255);
+  QImage imageVol1(buffer1, vol1->size[1], vol1->size[2], QImage::Format_ARGB32);
   QImage resultImage(imageVol1);
 
   if (lab1 != NULL && lab1->elementLength == 1) {
-    buffer = fillBuffer3AsColor(pos, (ScalarVolume *)lab1, 128);
-    QImage imageLab1(buffer, lab1->size[1], lab1->size[2], QImage::Format_ARGB32);
+    buffer2 = fillBuffer3AsColor(pos, (ScalarVolume *)lab1, 128);
+    QImage imageLab1(buffer2, lab1->size[1], lab1->size[2], QImage::Format_ARGB32);
 
-    buffer = fillBuffer3FromHBuffer(pos, (ScalarVolume *)lab1, 180);
-    QImage imageHBuffer3(buffer, lab1->size[1], lab1->size[2], QImage::Format_ARGB32);
+    buffer3 = fillBuffer3FromHBuffer(pos, (ScalarVolume *)lab1, 180);
+    QImage imageHBuffer3(buffer3, lab1->size[1], lab1->size[2], QImage::Format_ARGB32);
 
     // QPainter::CompositionMode mode = QPainter::CompositionMode_Overlay;
     QPainter::CompositionMode mode = QPainter::CompositionMode_SourceOver;
@@ -3237,6 +3404,12 @@ void MainWindow::updateImage3(int pos) { // [0, y, z]
 
   Image3->setPixmap(QPixmap::fromImage(resultImage));
   ui->scrollArea_3->setWidgetResizable(false);
+  if (buffer1)
+    free(buffer1);
+  if (buffer2)
+    free(buffer2);
+  if (buffer3)
+    free(buffer3);
 }
 
 // zoom in
@@ -3269,9 +3442,13 @@ void MainWindow::on_toolButton_2_toggled(bool checked) {
 // reset the buffer
 void MainWindow::on_toolButton_3_clicked()
 {
-  if (hbuffer.size()>0)
+  if (hbuffer.size()>0) {
     hbuffer.reset();
+    UndoRedo::getInstance().add(&hbuffer);
+    firstUndoStepDone = false;
+  }
   update();
+
 }
 
 // add to highlighted material
@@ -3290,20 +3467,31 @@ void MainWindow::on_toolButton_4_clicked()
     for (ulong i = hbuffer.find_first(); i < hbuffer.npos; i = hbuffer.find_next(i)) {
       lab1->dataPtr[i] = materialIdx;
     }
+
     hbuffer.reset();
     update();
+
+    UndoRedo::getInstance().add(&hbuffer, lab1);
+    firstUndoStepDone = false;
   }
 }
 
 // remove highlight from material
 void MainWindow::on_toolButton_5_clicked()
 {
+  if (!lab1)
+    return;
+
   // we have Exterior that we want to add the currently highlighted voxels to
   for (ulong i = hbuffer.find_first(); i < hbuffer.npos; i = hbuffer.find_next(i)) {
     lab1->dataPtr[i] = 0; // exterior
   }
+
   hbuffer.reset();
   update();
+
+  UndoRedo::getInstance().add(&hbuffer, lab1);
+  firstUndoStepDone = false;
 }
 
 // enable wand segmentation mode
@@ -3331,6 +3519,7 @@ void MainWindow::on_pushButton_5_clicked()
   }
   int materialIdx = item->text(1).toInt(&ok);
   if (ok) {
+
     // if not shift reset buffer first
     Qt::KeyboardModifiers keyMod = QApplication::keyboardModifiers();
     bool isSHIFT = keyMod.testFlag(Qt::ShiftModifier);
@@ -3344,6 +3533,9 @@ void MainWindow::on_pushButton_5_clicked()
         hbuffer[i] = true;
     }
     update();
+
+    UndoRedo::getInstance().add(&hbuffer);
+    firstUndoStepDone = false;
   }
 
 }
@@ -3403,4 +3595,16 @@ void MainWindow::on_treeWidget_doubleClicked(const QModelIndex &index)
 //  if (index.isValid()) {
 //    on_pushButton_clicked();
 //  }
+}
+
+// undo
+void MainWindow::on_actionUndo_triggered()
+{
+  undo();
+}
+
+// redo
+void MainWindow::on_actionRedo_triggered()
+{
+  redo();
 }

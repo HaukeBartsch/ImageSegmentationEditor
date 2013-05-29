@@ -36,8 +36,7 @@ class EventProcessing:public QObject
       } else if (event->type() == QEvent::MouseButtonRelease) {
               QMouseEvent *mouseEvent = static_cast<QMouseEvent*>(event);
               //fprintf(stderr, "Mouse event received at: %d %d\n", mouseEvent->pos().x(), mouseEvent->pos().y());
-              w->myMouseReleaseEvent(object, mouseEvent);
-              return false;
+              return w->myMouseReleaseEvent(object, mouseEvent);
               // statusBar()->showMessage(QString("Mouse move (%1,%2)").arg(mouseEvent->pos().x()).arg(mouseEvent->pos().y()));
       } else if (event->type() == QEvent::MouseButtonDblClick) {
               QMouseEvent *mouseEvent = static_cast<QMouseEvent*>(event);

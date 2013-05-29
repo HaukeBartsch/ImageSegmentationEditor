@@ -32,10 +32,12 @@ public:
 
     bool mouseEvent(QObject *object, QMouseEvent *mouseEvent);
     bool myKeyPressEvent(QObject *object, QKeyEvent *keyEvent);
-    void myMouseReleaseEvent (QObject *object, QMouseEvent * e);
+    bool myMouseReleaseEvent (QObject *object, QMouseEvent * e);
     void myMousePressEvent (QObject *object, QMouseEvent * e);
     bool myMouseWheelEvent (QObject *object, QWheelEvent * e);
     void myMouseButtonDblClick(QObject *object, QMouseEvent *mouseEvent);
+    void redo();
+    void undo();
 
 private slots:
     void on_pushButton_clicked();
@@ -80,6 +82,10 @@ private slots:
     void finishedSlot(QNetworkReply* reply);
 
     void on_treeWidget_doubleClicked(const QModelIndex &index);
+
+    void on_actionUndo_triggered();
+
+    void on_actionRedo_triggered();
 
 public slots:
     void LoadImage();
@@ -145,6 +151,7 @@ private:
     // create storage for the highlight
     // add buffer add and remove to currently hightlighted material
     boost::dynamic_bitset<> hbuffer;
+
     void setHighlightBuffer(QObject *object, QMouseEvent *e);
 
     enum Tools {
@@ -167,6 +174,8 @@ private:
     // get a list of strings from internet
     QNetworkAccessManager* nam;
     QStringList fetchModel(QString aString);
+
+    bool firstUndoStepDone;
 };
 
 #endif // MAINWINDOW_H

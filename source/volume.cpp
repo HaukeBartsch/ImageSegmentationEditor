@@ -32,6 +32,30 @@ ScalarVolume::ScalarVolume(std::vector<int> dims, MyPrimType type)
     this->voxelsize.resize(3,1.0);
 }
 
+Volume *ScalarVolume::duplicate() {
+  ScalarVolume *ret = new ScalarVolume(this->size, this->dataType);
+  ret->elementLength = this->elementLength;
+  ret->autoWindowLevel[0] = this->autoWindowLevel[0];
+  ret->autoWindowLevel[1] = this->autoWindowLevel[1];
+  memcpy(ret->dataPtr,
+         this->dataPtr,
+         (size_t)this->elementLength*
+         this->size[0]*
+         this->size[1]*
+         this->size[2]*
+         MyPrimType::getTypeSize(this->dataType));
+  ret->currentWindowLevel[0] = this->currentWindowLevel[0];
+  ret->currentWindowLevel[1] = this->currentWindowLevel[1];
+  ret->filename = this->filename;
+  ret->loadCmd = this->loadCmd;
+  ret->materialNames = this->materialNames;
+  ret->materialColors = this->materialColors;
+  ret->message = this->message;
+  ret->range = this->range;
+  ret->hist = this->hist;
+  return (Volume *)ret;
+}
+
 ScalarVolume::~ScalarVolume() {
   if (this->dataPtr)
     free(this->dataPtr);
@@ -460,6 +484,30 @@ ColorVolume::ColorVolume(std::vector<int> dims, MyPrimType type)
     this->voxelsize.resize(3,1.0);
 }
 
+Volume *ColorVolume::duplicate() {
+  ColorVolume *ret = new ColorVolume(this->size, this->dataType);
+  ret->elementLength = this->elementLength;
+  ret->autoWindowLevel[0] = this->autoWindowLevel[0];
+  ret->autoWindowLevel[1] = this->autoWindowLevel[1];
+  memcpy(ret->dataPtr,
+         this->dataPtr,
+         this->elementLength*
+         this->size[0]*
+         this->size[1]*
+         this->size[2]*
+         MyPrimType::getTypeSize(this->dataType));
+  ret->currentWindowLevel[0] = this->currentWindowLevel[0];
+  ret->currentWindowLevel[1] = this->currentWindowLevel[1];
+  ret->filename = this->filename;
+  ret->loadCmd = this->loadCmd;
+  ret->materialNames = this->materialNames;
+  ret->materialColors = this->materialColors;
+  ret->message = this->message;
+  ret->range = this->range;
+  ret->hist = this->hist;
+  return (Volume *)ret;
+}
+
 ColorVolume::~ColorVolume() {
   if (this->dataPtr)
     free(this->dataPtr);
@@ -608,7 +656,7 @@ void ColorVolume::updateRange() {
 }
 
 void ColorVolume::computeHist() {
-  hist.resize(512*3, 0);
+  hist.resize(512*elementLength, 0);
 
   // range needs to be known before
   if (range.size() != 6) {
@@ -624,9 +672,9 @@ void ColorVolume::computeHist() {
     case MyPrimType::CHAR : {
         signed char *d = (signed char *)this->dataPtr;
         for (long i = 0; i < (long)this->size[0] * this->size[1] * this->size[2]; i++) {
-          hist[CLAMP( (unsigned int) ( (d[0]-range[0])/(range[1]-range[0]) * hist.size()/3), 0, hist.size()/3-1) + 0*hist.size()/3]++;
-          hist[CLAMP( (unsigned int) ( (d[1]-range[2])/(range[3]-range[2]) * hist.size()/3), 0, hist.size()/3-1) + 1*hist.size()/3]++;
-          hist[CLAMP( (unsigned int) ( (d[2]-range[4])/(range[5]-range[4]) * hist.size()/3), 0, hist.size()/3-1) + 2*hist.size()/3]++;
+          hist[CLAMP( (unsigned int) ( (d[0]-range[0])/(range[1]-range[0]) * hist.size()/elementLength), 0, hist.size()/elementLength-1) + 0*hist.size()/elementLength]++;
+          hist[CLAMP( (unsigned int) ( (d[1]-range[2])/(range[3]-range[2]) * hist.size()/elementLength), 0, hist.size()/elementLength-1) + 1*hist.size()/elementLength]++;
+          hist[CLAMP( (unsigned int) ( (d[2]-range[4])/(range[5]-range[4]) * hist.size()/elementLength), 0, hist.size()/elementLength-1) + 2*hist.size()/elementLength]++;
           d+=4;
         }
         break;
@@ -634,9 +682,9 @@ void ColorVolume::computeHist() {
     case MyPrimType::UCHAR : {
         unsigned char *d = (unsigned char *)this->dataPtr;
         for (long i = 0; i < (long)this->size[0] * this->size[1] * this->size[2]; i++) {
-          hist[CLAMP( (unsigned int) ( (d[0]-range[0])/(range[1]-range[0]) * hist.size()/3), 0, hist.size()/3-1) + 0*hist.size()/3]++;
-          hist[CLAMP( (unsigned int) ( (d[1]-range[2])/(range[3]-range[2]) * hist.size()/3), 0, hist.size()/3-1) + 1*hist.size()/3]++;
-          hist[CLAMP( (unsigned int) ( (d[2]-range[4])/(range[5]-range[4]) * hist.size()/3), 0, hist.size()/3-1) + 2*hist.size()/3]++;
+          hist[CLAMP( (unsigned int) ( (d[0]-range[0])/(range[1]-range[0]) * hist.size()/elementLength), 0, hist.size()/elementLength-1) + 0*hist.size()/elementLength]++;
+          hist[CLAMP( (unsigned int) ( (d[1]-range[2])/(range[3]-range[2]) * hist.size()/elementLength), 0, hist.size()/elementLength-1) + 1*hist.size()/elementLength]++;
+          hist[CLAMP( (unsigned int) ( (d[2]-range[4])/(range[5]-range[4]) * hist.size()/elementLength), 0, hist.size()/elementLength-1) + 2*hist.size()/elementLength]++;
           d+=4;
         }
         break;
@@ -644,9 +692,9 @@ void ColorVolume::computeHist() {
     case MyPrimType::SHORT : {
         signed short *d = (signed short *)this->dataPtr;
         for (long i = 0; i < (long)this->size[0] * this->size[1] * this->size[2]; i++) {
-          hist[CLAMP( (unsigned int) ( (d[0]-range[0])/(range[1]-range[0]) * hist.size()/3), 0, hist.size()/3-1) + 0*hist.size()/3]++;
-          hist[CLAMP( (unsigned int) ( (d[1]-range[2])/(range[3]-range[2]) * hist.size()/3), 0, hist.size()/3-1) + 1*hist.size()/3]++;
-          hist[CLAMP( (unsigned int) ( (d[2]-range[4])/(range[5]-range[4]) * hist.size()/3), 0, hist.size()/3-1) + 2*hist.size()/3]++;
+          hist[CLAMP( (unsigned int) ( (d[0]-range[0])/(range[1]-range[0]) * hist.size()/elementLength), 0, hist.size()/elementLength-1) + 0*hist.size()/elementLength]++;
+          hist[CLAMP( (unsigned int) ( (d[1]-range[2])/(range[3]-range[2]) * hist.size()/elementLength), 0, hist.size()/elementLength-1) + 1*hist.size()/elementLength]++;
+          hist[CLAMP( (unsigned int) ( (d[2]-range[4])/(range[5]-range[4]) * hist.size()/elementLength), 0, hist.size()/elementLength-1) + 2*hist.size()/elementLength]++;
           d+=4;
         }
         break;
@@ -654,9 +702,9 @@ void ColorVolume::computeHist() {
     case MyPrimType::USHORT : {
         unsigned short *d = (unsigned short *)this->dataPtr;
         for (long i = 0; i < (long)this->size[0] * this->size[1] * this->size[2]; i++) {
-          hist[CLAMP( (unsigned int) ( (d[0]-range[0])/(range[1]-range[0]) * hist.size()/3), 0, hist.size()/3-1) + 0*hist.size()/3]++;
-          hist[CLAMP( (unsigned int) ( (d[1]-range[2])/(range[3]-range[2]) * hist.size()/3), 0, hist.size()/3-1) + 1*hist.size()/3]++;
-          hist[CLAMP( (unsigned int) ( (d[2]-range[4])/(range[5]-range[4]) * hist.size()/3), 0, hist.size()/3-1) + 2*hist.size()/3]++;
+          hist[CLAMP( (unsigned int) ( (d[0]-range[0])/(range[1]-range[0]) * hist.size()/elementLength), 0, hist.size()/elementLength-1) + 0*hist.size()/elementLength]++;
+          hist[CLAMP( (unsigned int) ( (d[1]-range[2])/(range[3]-range[2]) * hist.size()/elementLength), 0, hist.size()/elementLength-1) + 1*hist.size()/elementLength]++;
+          hist[CLAMP( (unsigned int) ( (d[2]-range[4])/(range[5]-range[4]) * hist.size()/elementLength), 0, hist.size()/elementLength-1) + 2*hist.size()/elementLength]++;
           d+=4;
         }
         break;
@@ -664,9 +712,9 @@ void ColorVolume::computeHist() {
     case MyPrimType::INT : {
         signed int *d = (signed int *)this->dataPtr;
         for (long i = 0; i < (long)this->size[0] * this->size[1] * this->size[2]; i++) {
-          hist[CLAMP( (unsigned int) ( (d[0]-range[0])/(range[1]-range[0]) * hist.size()/3), 0, hist.size()/3-1) + 0*hist.size()/3]++;
-          hist[CLAMP( (unsigned int) ( (d[1]-range[2])/(range[3]-range[2]) * hist.size()/3), 0, hist.size()/3-1) + 1*hist.size()/3]++;
-          hist[CLAMP( (unsigned int) ( (d[2]-range[4])/(range[5]-range[4]) * hist.size()/3), 0, hist.size()/3-1) + 2*hist.size()/3]++;
+          hist[CLAMP( (unsigned int) ( (d[0]-range[0])/(range[1]-range[0]) * hist.size()/elementLength), 0, hist.size()/elementLength-1) + 0*hist.size()/elementLength]++;
+          hist[CLAMP( (unsigned int) ( (d[1]-range[2])/(range[3]-range[2]) * hist.size()/elementLength), 0, hist.size()/elementLength-1) + 1*hist.size()/elementLength]++;
+          hist[CLAMP( (unsigned int) ( (d[2]-range[4])/(range[5]-range[4]) * hist.size()/elementLength), 0, hist.size()/elementLength-1) + 2*hist.size()/elementLength]++;
           d+=4;
         }
         break;
@@ -674,9 +722,9 @@ void ColorVolume::computeHist() {
     case MyPrimType::UINT : {
         unsigned int *d = (unsigned int *)this->dataPtr;
         for (long i = 0; i < (long)this->size[0] * this->size[1] * this->size[2]; i++) {
-          hist[CLAMP( (unsigned int) ( (d[0]-range[0])/(range[1]-range[0]) * hist.size()/3), 0, hist.size()/3-1) + 0*hist.size()/3]++;
-          hist[CLAMP( (unsigned int) ( (d[1]-range[2])/(range[3]-range[2]) * hist.size()/3), 0, hist.size()/3-1) + 1*hist.size()/3]++;
-          hist[CLAMP( (unsigned int) ( (d[2]-range[4])/(range[5]-range[4]) * hist.size()/3), 0, hist.size()/3-1) + 2*hist.size()/3]++;
+          hist[CLAMP( (unsigned int) ( (d[0]-range[0])/(range[1]-range[0]) * hist.size()/elementLength), 0, hist.size()/elementLength-1) + 0*hist.size()/elementLength]++;
+          hist[CLAMP( (unsigned int) ( (d[1]-range[2])/(range[3]-range[2]) * hist.size()/elementLength), 0, hist.size()/elementLength-1) + 1*hist.size()/elementLength]++;
+          hist[CLAMP( (unsigned int) ( (d[2]-range[4])/(range[5]-range[4]) * hist.size()/elementLength), 0, hist.size()/elementLength-1) + 2*hist.size()/elementLength]++;
           d+=4;
         }
         break;
@@ -684,9 +732,9 @@ void ColorVolume::computeHist() {
     case MyPrimType::FLOAT : {
         float *d = (float *)this->dataPtr;
         for (long i = 0; i < (long)this->size[0] * this->size[1] * this->size[2]; i++) {
-          hist[CLAMP( (unsigned int) ( (d[0]-range[0])/(range[1]-range[0]) * hist.size()/3), 0, hist.size()/3-1) + 0*hist.size()/3]++;
-          hist[CLAMP( (unsigned int) ( (d[1]-range[2])/(range[3]-range[2]) * hist.size()/3), 0, hist.size()/3-1) + 1*hist.size()/3]++;
-          hist[CLAMP( (unsigned int) ( (d[2]-range[4])/(range[5]-range[4]) * hist.size()/3), 0, hist.size()/3-1) + 2*hist.size()/3]++;
+          hist[CLAMP( (unsigned int) ( (d[0]-range[0])/(range[1]-range[0]) * hist.size()/elementLength), 0, hist.size()/elementLength-1) + 0*hist.size()/elementLength]++;
+          hist[CLAMP( (unsigned int) ( (d[1]-range[2])/(range[3]-range[2]) * hist.size()/elementLength), 0, hist.size()/elementLength-1) + 1*hist.size()/elementLength]++;
+          hist[CLAMP( (unsigned int) ( (d[2]-range[4])/(range[5]-range[4]) * hist.size()/elementLength), 0, hist.size()/elementLength-1) + 2*hist.size()/elementLength]++;
           d+=4;
         }
         break;
@@ -696,15 +744,15 @@ void ColorVolume::computeHist() {
   long long cumsum1 = 0;
   long long cumsum2 = 0;
   long long cumsum3 = 0;
-  for (unsigned int i = 0; i < hist.size()/3; i++) {
+  for (unsigned int i = 0; i < hist.size()/elementLength; i++) {
     cumsum1 += hist[i];
-    cumsum2 += hist[i + 1*hist.size()/3];
-    cumsum3 += hist[i + 2*hist.size()/3];
+    cumsum2 += hist[i + 1*hist.size()/elementLength];
+    cumsum3 += hist[i + 2*hist.size()/elementLength];
   }
   int step0 = 0; bool fs0 = false;
   int step1 = 0; bool fs1 = false;
   double val = 0.0;
-  for (unsigned int i = 0; i < hist.size()/3; i++) {
+  for (unsigned int i = 0; i < hist.size()/elementLength; i++) {
     val += (double)hist[i]/(double)cumsum1;
     if (!fs0 && val > 0.02) {
       fs0 = true;
@@ -716,10 +764,10 @@ void ColorVolume::computeHist() {
     }
   }
   float rangeCombined[2];
-  rangeCombined[0] = (range[0] + range[2] + range[4])/3.0f;
-  rangeCombined[1] = (range[1] + range[3] + range[5])/3.0f;
-  autoWindowLevel[0] = rangeCombined[0] + ((step0-0.0)/(hist.size()/3.0)) * (rangeCombined[1]-rangeCombined[0]); // set initial window level by 2..99 percent
-  autoWindowLevel[1] = rangeCombined[0] + ((step1-0.0)/(hist.size()/3.0)) * (rangeCombined[1]-rangeCombined[0]);
+  rangeCombined[0] = (range[0] + range[2] + range[4])/(float)elementLength;
+  rangeCombined[1] = (range[1] + range[3] + range[5])/(float)elementLength;
+  autoWindowLevel[0] = rangeCombined[0] + ((step0-0.0)/(hist.size()/(float)elementLength)) * (rangeCombined[1]-rangeCombined[0]); // set initial window level by 2..99 percent
+  autoWindowLevel[1] = rangeCombined[0] + ((step1-0.0)/(hist.size()/(float)elementLength)) * (rangeCombined[1]-rangeCombined[0]);
 }
 
 // flip a dimension

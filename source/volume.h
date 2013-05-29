@@ -30,6 +30,7 @@ public:
 
   virtual void updateRange() = 0;
   virtual void computeHist() = 0;
+  virtual Volume *duplicate() = 0;
 };
 
 class ScalarVolume : public Volume
@@ -44,6 +45,7 @@ public:
 
     virtual void updateRange();
     virtual void computeHist();
+    virtual Volume *duplicate();
 
     ColorVolume *convertToColorVolume(ScalarVolume *red, ScalarVolume *green, ScalarVolume *blue, ScalarVolume *alpha = NULL);
 
@@ -64,6 +66,7 @@ public:
 
     virtual void updateRange();
     virtual void computeHist();
+    virtual Volume *duplicate();
 
     // store bounding box information
 };

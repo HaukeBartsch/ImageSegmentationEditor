@@ -40,7 +40,6 @@
 
 #include <QApplication>
 
-#include "imageviewer.h"
 #include "mainwindow.h"
 #include "EventProcessing.h"
 
