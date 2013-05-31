@@ -12,6 +12,7 @@
 #include <QGraphicsView>
 #include <QEvent>
 #include <QSettings>
+#include "preferences.h"
 #include <QtNetwork/QNetworkAccessManager>
 
 #include <boost/dynamic_bitset.hpp>
@@ -86,6 +87,8 @@ private slots:
     void on_actionUndo_triggered();
 
     void on_actionRedo_triggered();
+
+    void on_actionPreferences_triggered();
 
 public slots:
     void LoadImage();
@@ -176,6 +179,8 @@ private:
     QStringList fetchModel(QString aString);
 
     bool firstUndoStepDone;
+
+    Preferences *preferencesDialog;
 };
 
 #endif // MAINWINDOW_H

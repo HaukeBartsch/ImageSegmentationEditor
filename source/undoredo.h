@@ -166,8 +166,10 @@ class UndoRedo
           return NULL;
         }
 
+        int maxUndoSteps;
+
     private:
-        UndoRedo() { currentStep = -1; };                   // Constructor? (the {} brackets) are needed here.
+        UndoRedo() { currentStep = -1; maxUndoSteps = -1; };// Constructor? (the {} brackets) are needed here.
         UndoRedo(UndoRedo const&);       // Don't Implement
         void operator=(UndoRedo const&); // Don't implement
 

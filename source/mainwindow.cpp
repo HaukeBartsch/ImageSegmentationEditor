@@ -88,6 +88,8 @@ MainWindow::MainWindow(QWidget *parent) :
               this, SLOT(finishedSlot(QNetworkReply*)));
 
   firstUndoStepDone = false;
+
+  preferencesDialog = new Preferences();
 }
 
 MainWindow::~MainWindow()
@@ -2248,7 +2250,7 @@ void MainWindow::createActions() {
 
 void MainWindow::about() {
   QMessageBox::about(this, tr("About Image Segmentation Editor"),
-                     tr("<p>The <b>Image Segmentation Editor v0.2</b> is an application that"
+                     tr("<p>The <b>Image Segmentation Editor v0.3</b> is an application that"
                         " supports image segmentation on multi-modal image data."
                         "</p><br/>Hauke Bartsch, Dr. rer. nat. 2013"));
 }
@@ -3607,4 +3609,11 @@ void MainWindow::on_actionUndo_triggered()
 void MainWindow::on_actionRedo_triggered()
 {
   redo();
+}
+
+// open the preferences window
+void MainWindow::on_actionPreferences_triggered()
+{
+  if (preferencesDialog)
+    preferencesDialog->show();
 }
