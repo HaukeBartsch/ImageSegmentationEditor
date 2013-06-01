@@ -3466,7 +3466,7 @@ void MainWindow::on_toolButton_4_clicked()
   int materialIdx = item->text(1).toInt(&ok);
   if (ok) {
     // we have a material that we want to add the currently highlighted voxels to
-    for (ulong i = hbuffer.find_first(); i < hbuffer.npos; i = hbuffer.find_next(i)) {
+    for (boost::dynamic_bitset<>::size_type i = hbuffer.find_first(); i != hbuffer.npos; i = hbuffer.find_next(i)) {
       lab1->dataPtr[i] = materialIdx;
     }
 
@@ -3485,7 +3485,7 @@ void MainWindow::on_toolButton_5_clicked()
     return;
 
   // we have Exterior that we want to add the currently highlighted voxels to
-  for (ulong i = hbuffer.find_first(); i < hbuffer.npos; i = hbuffer.find_next(i)) {
+  for (boost::dynamic_bitset<>::size_type i = hbuffer.find_first(); i != hbuffer.npos; i = hbuffer.find_next(i)) {
     lab1->dataPtr[i] = 0; // exterior
   }
 
