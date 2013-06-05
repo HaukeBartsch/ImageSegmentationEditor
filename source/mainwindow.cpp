@@ -70,7 +70,7 @@ MainWindow::MainWindow(QWidget *parent) :
   mouseIsDown = false;
 
   scaleFactor1  = 4.8;
-  scaleFactor23 = 2.4;
+  scaleFactor23 = 4.8;
 
   qsrand(1234);
   currentTool = None;
@@ -163,6 +163,22 @@ bool MainWindow::myKeyPressEvent(QObject *object, QKeyEvent *keyEvent) {
     return true;
   }
 
+  if (keyEvent->key() == Qt::Key_Tab && (object == Image1 ||
+                                         object == Image2 ||
+                                         object == Image3)) { // move through orientations
+    std::vector<QWidget *> co(3);
+    co[0] = ui->scrollArea_4->takeWidget();
+    co[1] = ui->scrollArea_2->takeWidget();
+    co[2] = ui->scrollArea_3->takeWidget();
+
+    ui->scrollArea_4->setWidget(co[1]);
+    ui->scrollArea_2->setWidget(co[2]);
+    ui->scrollArea_3->setWidget(co[0]);
+    ((QWidget*)object)->setFocus( Qt::TabFocusReason );
+
+    keyEvent->accept();
+    return true;
+  }
   if (keyEvent->key() == Qt::Key_0 && (object == Image1 ||
                                        object == Image2 ||
                                        object == Image3)) {  // reset window level
@@ -472,7 +488,7 @@ void MainWindow::setHighlightBuffer(QObject *object, QMouseEvent *e) {
   if (!lab1 || !hbuffer.size())
     return;
 
-  if (hbuffer.size() != (ulong)lab1->size[0]*lab1->size[1]*lab1->size[2])
+  if (hbuffer.size() != (size_t)lab1->size[0]*lab1->size[1]*lab1->size[2])
     return;
   // can be several tools create a brush first
   if (object == Image1) {
@@ -618,31 +634,31 @@ void MainWindow::regionGrowing(int posx, int posy, int slice) {
     return;
   float fuzzy = 0.2*fabs(windowLevel[1]-windowLevel[0])
       * 0.2*fabs(windowLevel[1]-windowLevel[0]);
-  ulong offset = (ulong)slice*vol1->size[0]*vol1->size[1];
+  size_t offset = (size_t)slice*vol1->size[0]*vol1->size[1];
   bool isCtrl = QApplication::keyboardModifiers() & Qt::ControlModifier;
 
   // either the current volume is a scalar or a color field
   if (vol1->elementLength == 1) {
 
     boost::dynamic_bitset<> done(vol1->size[0]*vol1->size[1]); // what was found
-    std::vector<ulong> todo; // helper array to keep track what needs to be added
+    std::vector<size_t> todo; // helper array to keep track what needs to be added
     switch(vol1->dataType) {
       case MyPrimType::UCHAR : {
           unsigned char *d = (unsigned char *)vol1->dataPtr + offset*vol1->elementLength;
-          ulong idx = posy*vol1->size[0]+posx;
+          size_t idx = (size_t)posy*vol1->size[0]+posx;
           float start[1];
           start[0] = d[idx];
           done.set(idx);
           todo.push_back(idx);
-          for (ulong i = 0; i < todo.size(); i++) {
-            ulong here = todo.at(i);
+          for (size_t i = 0; i < todo.size(); i++) {
+            size_t here = todo.at(i);
             int y = floor(here/vol1->size[0]);
             int x = here-(y*vol1->size[0]);
 
-            ulong n1 = (y+1)*vol1->size[0]+ x;
-            ulong n2 = (y-1)*vol1->size[0]+ x;
-            ulong n3 = (y)  *vol1->size[0]+(x+1);
-            ulong n4 = (y)  *vol1->size[0]+(x-1);
+            size_t n1 = (y+1)*vol1->size[0]+ x;
+            size_t n2 = (y-1)*vol1->size[0]+ x;
+            size_t n3 = (y)  *vol1->size[0]+(x+1);
+            size_t n4 = (y)  *vol1->size[0]+(x-1);
             if (y+1 < vol1->size[1] && !done[n1]) {
               // check intensities at this location relative to first location
               float h[1];
@@ -684,20 +700,20 @@ void MainWindow::regionGrowing(int posx, int posy, int slice) {
         }
       case MyPrimType::SHORT : {
           short *d = (short *)vol1->dataPtr + offset*vol1->elementLength;
-          ulong idx = posy*vol1->size[0]+posx;
+          size_t idx = (size_t)posy*vol1->size[0]+posx;
           float start[1];
           start[0] = d[idx];
           done.set(idx);
           todo.push_back(idx);
-          for (ulong i = 0; i < todo.size(); i++) {
-            ulong here = todo.at(i);
+          for (size_t i = 0; i < todo.size(); i++) {
+            size_t here = todo.at(i);
             int y = floor(here/vol1->size[0]);
             int x = here-(y*vol1->size[0]);
 
-            ulong n1 = (y+1)*vol1->size[0]+ x;
-            ulong n2 = (y-1)*vol1->size[0]+ x;
-            ulong n3 = (y)  *vol1->size[0]+(x+1);
-            ulong n4 = (y)  *vol1->size[0]+(x-1);
+            size_t n1 = (y+1)*vol1->size[0]+ x;
+            size_t n2 = (y-1)*vol1->size[0]+ x;
+            size_t n3 = (y)  *vol1->size[0]+(x+1);
+            size_t n4 = (y)  *vol1->size[0]+(x-1);
             if (y+1 < vol1->size[1] && !done[n1]) {
               // check intensities at this location relative to first location
               float h[1];
@@ -739,20 +755,20 @@ void MainWindow::regionGrowing(int posx, int posy, int slice) {
         }
       case MyPrimType::USHORT : {
           unsigned short *d = (unsigned short *)vol1->dataPtr + offset*vol1->elementLength;
-          ulong idx = posy*vol1->size[0]+posx;
+          size_t idx = (size_t)posy*vol1->size[0]+posx;
           float start[1];
           start[0] = d[idx];
           done.set(idx);
           todo.push_back(idx);
-          for (ulong i = 0; i < todo.size(); i++) {
-            ulong here = todo.at(i);
+          for (size_t i = 0; i < todo.size(); i++) {
+            size_t here = todo.at(i);
             int y = floor(here/vol1->size[0]);
             int x = here-(y*vol1->size[0]);
 
-            ulong n1 = (y+1)*vol1->size[0]+ x;
-            ulong n2 = (y-1)*vol1->size[0]+ x;
-            ulong n3 = (y)  *vol1->size[0]+(x+1);
-            ulong n4 = (y)  *vol1->size[0]+(x-1);
+            size_t n1 = (y+1)*vol1->size[0]+ x;
+            size_t n2 = (y-1)*vol1->size[0]+ x;
+            size_t n3 = (y)  *vol1->size[0]+(x+1);
+            size_t n4 = (y)  *vol1->size[0]+(x-1);
             if (y+1 < vol1->size[1] && !done[n1]) {
               // check intensities at this location relative to first location
               float h[1];
@@ -794,20 +810,20 @@ void MainWindow::regionGrowing(int posx, int posy, int slice) {
         }
       case MyPrimType::FLOAT : {
           float *d = (float *)vol1->dataPtr + offset*vol1->elementLength;
-          ulong idx = posy*vol1->size[0]+posx;
+          size_t idx = (size_t)posy*vol1->size[0]+posx;
           float start[1];
           start[0] = d[idx];
           done.set(idx);
           todo.push_back(idx);
-          for (ulong i = 0; i < todo.size(); i++) {
-            ulong here = todo.at(i);
+          for (size_t i = 0; i < todo.size(); i++) {
+            size_t here = todo.at(i);
             int y = floor(here/vol1->size[0]);
             int x = here-(y*vol1->size[0]);
 
-            ulong n1 = (y+1)*vol1->size[0]+ x;
-            ulong n2 = (y-1)*vol1->size[0]+ x;
-            ulong n3 = (y)  *vol1->size[0]+(x+1);
-            ulong n4 = (y)  *vol1->size[0]+(x-1);
+            size_t n1 = (y+1)*vol1->size[0]+ x;
+            size_t n2 = (y-1)*vol1->size[0]+ x;
+            size_t n3 = (y)  *vol1->size[0]+(x+1);
+            size_t n4 = (y)  *vol1->size[0]+(x-1);
             if (y+1 < vol1->size[1] && !done[n1]) {
               // check intensities at this location relative to first location
               float h[1];
@@ -849,20 +865,20 @@ void MainWindow::regionGrowing(int posx, int posy, int slice) {
         }
       case MyPrimType::INT : {
           signed int *d = (signed int *)vol1->dataPtr + offset*vol1->elementLength;
-          ulong idx = posy*vol1->size[0]+posx;
+          size_t idx = posy*vol1->size[0]+posx;
           float start[1];
           start[0] = d[idx];
           done.set(idx);
           todo.push_back(idx);
-          for (ulong i = 0; i < todo.size(); i++) {
-            ulong here = todo.at(i);
+          for (size_t i = 0; i < todo.size(); i++) {
+            size_t here = todo.at(i);
             int y = floor(here/vol1->size[0]);
             int x = here-(y*vol1->size[0]);
 
-            ulong n1 = (y+1)*vol1->size[0]+ x;
-            ulong n2 = (y-1)*vol1->size[0]+ x;
-            ulong n3 = (y)  *vol1->size[0]+(x+1);
-            ulong n4 = (y)  *vol1->size[0]+(x-1);
+            size_t n1 = (y+1)*vol1->size[0]+ x;
+            size_t n2 = (y-1)*vol1->size[0]+ x;
+            size_t n3 = (y)  *vol1->size[0]+(x+1);
+            size_t n4 = (y)  *vol1->size[0]+(x-1);
             if (y+1 < vol1->size[1] && !done[n1]) {
               // check intensities at this location relative to first location
               float h[1];
@@ -904,20 +920,20 @@ void MainWindow::regionGrowing(int posx, int posy, int slice) {
         }
       case MyPrimType::UINT : {
           unsigned int *d = (unsigned int *)vol1->dataPtr + offset*vol1->elementLength;
-          ulong idx = posy*vol1->size[0]+posx;
+          size_t idx = (size_t)posy*vol1->size[0]+posx;
           float start[1];
           start[0] = d[idx];
           done.set(idx);
           todo.push_back(idx);
-          for (ulong i = 0; i < todo.size(); i++) {
-            ulong here = todo.at(i);
+          for (size_t i = 0; i < todo.size(); i++) {
+            size_t here = todo.at(i);
             int y = floor(here/vol1->size[0]);
             int x = here-(y*vol1->size[0]);
 
-            ulong n1 = (y+1)*vol1->size[0]+ x;
-            ulong n2 = (y-1)*vol1->size[0]+ x;
-            ulong n3 = (y)  *vol1->size[0]+(x+1);
-            ulong n4 = (y)  *vol1->size[0]+(x-1);
+            size_t n1 = (y+1)*vol1->size[0]+ x;
+            size_t n2 = (y-1)*vol1->size[0]+ x;
+            size_t n3 = (y)  *vol1->size[0]+(x+1);
+            size_t n4 = (y)  *vol1->size[0]+(x-1);
             if (y+1 < vol1->size[1] && !done[n1]) {
               // check intensities at this location relative to first location
               float h[1];
@@ -962,33 +978,33 @@ void MainWindow::regionGrowing(int posx, int posy, int slice) {
         }
     }
     // now copy everything in done into the hbuffer
-    for (ulong i = 0; i < done.size(); i++) {
+    for (size_t i = 0; i < done.size(); i++) {
       if (done[i])
         hbuffer[offset+i] = !isCtrl;
     }
 
   } else if (vol1->elementLength == 4) {
     boost::dynamic_bitset<> done(vol1->size[0]*vol1->size[1]); // what was found
-    std::vector<ulong> todo; // helper array to keep track what needs to be added
+    std::vector<size_t> todo; // helper array to keep track what needs to be added
     switch(vol1->dataType) {
       case MyPrimType::UCHAR :
         unsigned char *d = (unsigned char *)vol1->dataPtr + offset*vol1->elementLength;
-        ulong idx = posy*vol1->size[0]+posx;
+        size_t idx = (size_t)posy*vol1->size[0]+posx;
         float start[3];
         start[0] = d[4*idx+0];
         start[1] = d[4*idx+1];
         start[2] = d[4*idx+2];
         done.set(idx);
         todo.push_back(idx);
-        for (ulong i = 0; i < todo.size(); i++) {
-          ulong here = todo.at(i);
+        for (size_t i = 0; i < todo.size(); i++) {
+          size_t here = todo.at(i);
           int y = floor(here/vol1->size[0]);
           int x = here-(y*vol1->size[0]);
 
-          ulong n1 = (y+1)*vol1->size[0]+ x;
-          ulong n2 = (y-1)*vol1->size[0]+ x;
-          ulong n3 = (y)  *vol1->size[0]+(x+1);
-          ulong n4 = (y)  *vol1->size[0]+(x-1);
+          size_t n1 = (size_t)(y+1)*vol1->size[0]+ x;
+          size_t n2 = (size_t)(y-1)*vol1->size[0]+ x;
+          size_t n3 = (size_t)(y)  *vol1->size[0]+(x+1);
+          size_t n4 = (size_t)(y)  *vol1->size[0]+(x-1);
           if (y+1 < vol1->size[1] && !done[n1]) {
             // check intensities at this location relative to first location
             float h[3];
@@ -1045,7 +1061,7 @@ void MainWindow::regionGrowing(int posx, int posy, int slice) {
         break;
     }
     // now copy everything in done into the hbuffer
-    for (ulong i = 0; i < done.size(); i++) {
+    for (size_t i = 0; i < done.size(); i++) {
       if (done[i])
         hbuffer[offset+i] = !isCtrl;
     }
@@ -1069,25 +1085,25 @@ void MainWindow::regionGrowing2(int posx, int posy, int slice) {  // slice is in
   if (vol1->elementLength == 1) {
 
     boost::dynamic_bitset<> done(vol1->size[0]*vol1->size[2]*vol1->size[1]); // what was found
-    std::vector<ulong> todo; // helper array to keep track what needs to be added
+    std::vector<size_t> todo; // helper array to keep track what needs to be added
     switch(vol1->dataType) {
       case MyPrimType::UCHAR : {
           unsigned char *d = (unsigned char *)vol1->dataPtr;
-          ulong idx = posy*vol1->size[0]*vol1->size[1]+slice*vol1->size[0]+posx;
+          size_t idx = (size_t)posy*vol1->size[0]*vol1->size[1]+slice*vol1->size[0]+posx;
           float start[1];
           start[0] = d[idx];
           done.set(idx);
           todo.push_back(idx);
-          for (ulong i = 0; i < todo.size(); i++) {
-            ulong here = todo.at(i);
+          for (size_t i = 0; i < todo.size(); i++) {
+            size_t here = todo.at(i);
             int y  = floor(here/(vol1->size[0]*vol1->size[1]));
             int s  = floor((here-(y*vol1->size[0]*vol1->size[1]))/vol1->size[0]);
             int x  = here - (y*vol1->size[0]*vol1->size[1] + s * vol1->size[0]);
 
-            ulong n1 = (y+1)*vol1->size[0]*vol1->size[1]+slice*vol1->size[0]+x;
-            ulong n2 = (y-1)*vol1->size[0]*vol1->size[1]+slice*vol1->size[0]+x;
-            ulong n3 = (y)  *vol1->size[0]*vol1->size[1]+slice*vol1->size[0]+(x+1);
-            ulong n4 = (y)  *vol1->size[0]*vol1->size[1]+slice*vol1->size[0]+(x-1);
+            size_t n1 = (size_t)(y+1)*vol1->size[0]*vol1->size[1]+slice*vol1->size[0]+x;
+            size_t n2 = (size_t)(y-1)*vol1->size[0]*vol1->size[1]+slice*vol1->size[0]+x;
+            size_t n3 = (size_t)(y)  *vol1->size[0]*vol1->size[1]+slice*vol1->size[0]+(x+1);
+            size_t n4 = (size_t)(y)  *vol1->size[0]*vol1->size[1]+slice*vol1->size[0]+(x-1);
             if (y+1 < vol1->size[2] && !done[n1]) {
               // check intensities at this location relative to first location
               float h[1];
@@ -1129,21 +1145,21 @@ void MainWindow::regionGrowing2(int posx, int posy, int slice) {  // slice is in
         }
       case MyPrimType::FLOAT : {
           float *d = (float *)vol1->dataPtr;
-          ulong idx = posy*vol1->size[0]*vol1->size[1]+slice*vol1->size[0]+posx;
+          size_t idx = (size_t)posy*vol1->size[0]*vol1->size[1]+slice*vol1->size[0]+posx;
           float start[1];
           start[0] = d[idx];
           done.set(idx);
           todo.push_back(idx);
-          for (ulong i = 0; i < todo.size(); i++) {
-            ulong here = todo.at(i);
+          for (size_t i = 0; i < todo.size(); i++) {
+            size_t here = todo.at(i);
             int y  = floor(here/(vol1->size[0]*vol1->size[1]));
             int s  = floor((here-(y*vol1->size[0]*vol1->size[1]))/vol1->size[0]);
             int x  = here - (y*vol1->size[0]*vol1->size[1] + s * vol1->size[0]);
 
-            ulong n1 = (y+1)*vol1->size[0]*vol1->size[1]+slice*vol1->size[0]+x;
-            ulong n2 = (y-1)*vol1->size[0]*vol1->size[1]+slice*vol1->size[0]+x;
-            ulong n3 = (y)  *vol1->size[0]*vol1->size[1]+slice*vol1->size[0]+(x+1);
-            ulong n4 = (y)  *vol1->size[0]*vol1->size[1]+slice*vol1->size[0]+(x-1);
+            size_t n1 = (size_t)(y+1)*vol1->size[0]*vol1->size[1]+slice*vol1->size[0]+x;
+            size_t n2 = (size_t)(y-1)*vol1->size[0]*vol1->size[1]+slice*vol1->size[0]+x;
+            size_t n3 = (size_t)(y)  *vol1->size[0]*vol1->size[1]+slice*vol1->size[0]+(x+1);
+            size_t n4 = (size_t)(y)  *vol1->size[0]*vol1->size[1]+slice*vol1->size[0]+(x-1);
             if (y+1 < vol1->size[2] && !done[n1]) {
               // check intensities at this location relative to first location
               float h[1];
@@ -1185,21 +1201,21 @@ void MainWindow::regionGrowing2(int posx, int posy, int slice) {  // slice is in
         }
       case MyPrimType::SHORT : {
           short *d = (short *)vol1->dataPtr;
-          ulong idx = posy*vol1->size[0]*vol1->size[1]+slice*vol1->size[0]+posx;
+          size_t idx = (size_t)posy*vol1->size[0]*vol1->size[1]+slice*vol1->size[0]+posx;
           float start[1];
           start[0] = d[idx];
           done.set(idx);
           todo.push_back(idx);
-          for (ulong i = 0; i < todo.size(); i++) {
-            ulong here = todo.at(i);
+          for (size_t i = 0; i < todo.size(); i++) {
+            size_t here = todo.at(i);
             int y  = floor(here/(vol1->size[0]*vol1->size[1]));
             int s  = floor((here-(y*vol1->size[0]*vol1->size[1]))/vol1->size[0]);
             int x  = here - (y*vol1->size[0]*vol1->size[1] + s * vol1->size[0]);
 
-            ulong n1 = (y+1)*vol1->size[0]*vol1->size[1]+slice*vol1->size[0]+x;
-            ulong n2 = (y-1)*vol1->size[0]*vol1->size[1]+slice*vol1->size[0]+x;
-            ulong n3 = (y)  *vol1->size[0]*vol1->size[1]+slice*vol1->size[0]+(x+1);
-            ulong n4 = (y)  *vol1->size[0]*vol1->size[1]+slice*vol1->size[0]+(x-1);
+            size_t n1 = (size_t)(y+1)*vol1->size[0]*vol1->size[1]+slice*vol1->size[0]+x;
+            size_t n2 = (size_t)(y-1)*vol1->size[0]*vol1->size[1]+slice*vol1->size[0]+x;
+            size_t n3 = (size_t)(y)  *vol1->size[0]*vol1->size[1]+slice*vol1->size[0]+(x+1);
+            size_t n4 = (size_t)(y)  *vol1->size[0]*vol1->size[1]+slice*vol1->size[0]+(x-1);
             if (y+1 < vol1->size[2] && !done[n1]) {
               // check intensities at this location relative to first location
               float h[1];
@@ -1244,17 +1260,17 @@ void MainWindow::regionGrowing2(int posx, int posy, int slice) {  // slice is in
         }
     }
     // now copy everything in done into the hbuffer
-    for (ulong i = 0; i < done.size(); i++) {
+    for (size_t i = 0; i < done.size(); i++) {
       if (done[i])
         hbuffer[i] = !isCtrl;
     }
   } else if (vol1->elementLength == 4) {
     boost::dynamic_bitset<> done(vol1->size[0]*vol1->size[1]*vol1->size[2]); // what was found
-    std::vector<ulong> todo; // helper array to keep track what needs to be added
+    std::vector<size_t> todo; // helper array to keep track what needs to be added
     switch(vol1->dataType) {
       case MyPrimType::UCHAR : {
           unsigned char *d = (unsigned char *)vol1->dataPtr;
-          ulong idx = posy*vol1->size[0]*vol1->size[1]+slice*vol1->size[0]+posx;
+          size_t idx = (size_t)posy*vol1->size[0]*vol1->size[1]+slice*vol1->size[0]+posx;
 
           float start[3];
           start[0] = d[4*idx+0];
@@ -1262,16 +1278,16 @@ void MainWindow::regionGrowing2(int posx, int posy, int slice) {  // slice is in
           start[2] = d[4*idx+2];
           done.set(idx);
           todo.push_back(idx);
-          for (ulong i = 0; i < todo.size(); i++) {
-            ulong here = todo.at(i);
+          for (size_t i = 0; i < todo.size(); i++) {
+            size_t here = todo.at(i);
             int y  = floor(here/(vol1->size[0]*vol1->size[1]));
             int s  = floor((here-(y*vol1->size[0]*vol1->size[1]))/vol1->size[0]);
             int x  = here - (y*vol1->size[0]*vol1->size[1] + s * vol1->size[0]);
 
-            ulong n1 = (y+1)*vol1->size[0]*vol1->size[1]+slice*vol1->size[0]+x;
-            ulong n2 = (y-1)*vol1->size[0]*vol1->size[1]+slice*vol1->size[0]+x;
-            ulong n3 = (y)  *vol1->size[0]*vol1->size[1]+slice*vol1->size[0]+(x+1);
-            ulong n4 = (y)  *vol1->size[0]*vol1->size[1]+slice*vol1->size[0]+(x-1);
+            size_t n1 = (size_t)(y+1)*vol1->size[0]*vol1->size[1]+slice*vol1->size[0]+x;
+            size_t n2 = (size_t)(y-1)*vol1->size[0]*vol1->size[1]+slice*vol1->size[0]+x;
+            size_t n3 = (size_t)(y)  *vol1->size[0]*vol1->size[1]+slice*vol1->size[0]+(x+1);
+            size_t n4 = (size_t)(y)  *vol1->size[0]*vol1->size[1]+slice*vol1->size[0]+(x-1);
             if (y+1 < vol1->size[2] && !done[n1]) {
               // check intensities at this location relative to first location
               float h[3];
@@ -1329,7 +1345,7 @@ void MainWindow::regionGrowing2(int posx, int posy, int slice) {  // slice is in
         break;
       case MyPrimType::FLOAT : {
           float *d = (float *)vol1->dataPtr;
-          ulong idx = posy*vol1->size[0]*vol1->size[1]+slice*vol1->size[0]+posx;
+          size_t idx = (size_t)posy*vol1->size[0]*vol1->size[1]+slice*vol1->size[0]+posx;
 
           float start[3];
           start[0] = d[4*idx+0];
@@ -1337,16 +1353,16 @@ void MainWindow::regionGrowing2(int posx, int posy, int slice) {  // slice is in
           start[2] = d[4*idx+2];
           done.set(idx);
           todo.push_back(idx);
-          for (ulong i = 0; i < todo.size(); i++) {
-            ulong here = todo.at(i);
+          for (size_t i = 0; i < todo.size(); i++) {
+            size_t here = todo.at(i);
             int y  = floor(here/(vol1->size[0]*vol1->size[1]));
             int s  = floor((here-(y*vol1->size[0]*vol1->size[1]))/vol1->size[0]);
             int x  = here - (y*vol1->size[0]*vol1->size[1] + s * vol1->size[0]);
 
-            ulong n1 = (y+1)*vol1->size[0]*vol1->size[1]+slice*vol1->size[0]+x;
-            ulong n2 = (y-1)*vol1->size[0]*vol1->size[1]+slice*vol1->size[0]+x;
-            ulong n3 = (y)  *vol1->size[0]*vol1->size[1]+slice*vol1->size[0]+(x+1);
-            ulong n4 = (y)  *vol1->size[0]*vol1->size[1]+slice*vol1->size[0]+(x-1);
+            size_t n1 = (size_t)(y+1)*vol1->size[0]*vol1->size[1]+slice*vol1->size[0]+x;
+            size_t n2 = (size_t)(y-1)*vol1->size[0]*vol1->size[1]+slice*vol1->size[0]+x;
+            size_t n3 = (size_t)(y)  *vol1->size[0]*vol1->size[1]+slice*vol1->size[0]+(x+1);
+            size_t n4 = (size_t)(y)  *vol1->size[0]*vol1->size[1]+slice*vol1->size[0]+(x-1);
             if (y+1 < vol1->size[2] && !done[n1]) {
               // check intensities at this location relative to first location
               float h[3];
@@ -1404,7 +1420,7 @@ void MainWindow::regionGrowing2(int posx, int posy, int slice) {  // slice is in
         }
     }
     // now copy everything in done into the hbuffer
-    for (ulong i = 0; i < done.size(); i++) {
+    for (size_t i = 0; i < done.size(); i++) {
       if (done[i])
         hbuffer[i] = !isCtrl;
     }
@@ -1418,7 +1434,7 @@ void MainWindow::regionGrowing3(int posx, int posy, int slice) {  // slice is in
   if (!vol1 || posx < 0 || posx > vol1->size[1]-1 ||
       posy  < 0 || posy  > vol1->size[2]-1 ||
       slice < 0 || slice > vol1->size[0]-1 ||
-      hbuffer.size() != (ulong)vol1->size[0]*vol1->size[1]*vol1->size[2])
+      hbuffer.size() != (size_t)vol1->size[0]*vol1->size[1]*vol1->size[2])
     return;
   float fuzzy = 0.2*fabs(windowLevel[1]-windowLevel[0])
       * 0.2*fabs(windowLevel[1]-windowLevel[0]);
@@ -1428,25 +1444,25 @@ void MainWindow::regionGrowing3(int posx, int posy, int slice) {  // slice is in
   if (vol1->elementLength == 1) {
 
     boost::dynamic_bitset<> done(vol1->size[0]*vol1->size[1]*vol1->size[2]); // what was found
-    std::vector<ulong> todo; // helper array to keep track what needs to be added
+    std::vector<size_t> todo; // helper array to keep track what needs to be added
     switch(vol1->dataType) {
       case MyPrimType::UCHAR : {
           unsigned char *d = (unsigned char *)vol1->dataPtr;
-          ulong idx = posy*vol1->size[0]*vol1->size[1]+posx*vol1->size[0]+slice;
+          size_t idx = (size_t)posy*vol1->size[0]*vol1->size[1]+posx*vol1->size[0]+slice;
           float start[1];
           start[0] = d[idx];
           done.set(idx);
           todo.push_back(idx);
-          for (ulong i = 0; i < todo.size(); i++) {
-            ulong here = todo.at(i);
+          for (size_t i = 0; i < todo.size(); i++) {
+            size_t here = todo.at(i);
             int y  = floor(here/(vol1->size[0]*vol1->size[1]));
             int x  = floor((here-(y*vol1->size[0]*vol1->size[1]))/vol1->size[0]);
             //int s  = here - (y*vol1->size[0]*vol1->size[1] + x * vol1->size[0]);
 
-            ulong n1 = (y+1)*vol1->size[0]*vol1->size[1]+x*vol1->size[0]+slice;
-            ulong n2 = (y-1)*vol1->size[0]*vol1->size[1]+x*vol1->size[0]+slice;
-            ulong n3 = (y)  *vol1->size[0]*vol1->size[1]+(x+1)*vol1->size[0]+slice;
-            ulong n4 = (y)  *vol1->size[0]*vol1->size[1]+(x-1)*vol1->size[0]+slice;
+            size_t n1 = (size_t)(y+1)*vol1->size[0]*vol1->size[1]+x*vol1->size[0]+slice;
+            size_t n2 = (size_t)(y-1)*vol1->size[0]*vol1->size[1]+x*vol1->size[0]+slice;
+            size_t n3 = (size_t)(y)  *vol1->size[0]*vol1->size[1]+(x+1)*vol1->size[0]+slice;
+            size_t n4 = (size_t)(y)  *vol1->size[0]*vol1->size[1]+(x-1)*vol1->size[0]+slice;
             if (y+1 < vol1->size[2] && !done[n1]) {
               // check intensities at this location relative to first location
               float h[1];
@@ -1488,21 +1504,21 @@ void MainWindow::regionGrowing3(int posx, int posy, int slice) {  // slice is in
         }
       case MyPrimType::SHORT : {
           short *d = (short *)vol1->dataPtr;
-          ulong idx = posy*vol1->size[0]*vol1->size[1]+posx*vol1->size[0]+slice;
+          size_t idx = (size_t)posy*vol1->size[0]*vol1->size[1]+posx*vol1->size[0]+slice;
           float start[1];
           start[0] = d[idx];
           done.set(idx);
           todo.push_back(idx);
-          for (ulong i = 0; i < todo.size(); i++) {
-            ulong here = todo.at(i);
+          for (size_t i = 0; i < todo.size(); i++) {
+            size_t here = todo.at(i);
             int y  = floor(here/(vol1->size[0]*vol1->size[1]));
             int x  = floor((here-(y*vol1->size[0]*vol1->size[1]))/vol1->size[0]);
             //int s  = here - (y*vol1->size[0]*vol1->size[1] + x * vol1->size[0]);
 
-            ulong n1 = (y+1)*vol1->size[0]*vol1->size[1]+x*vol1->size[0]+slice;
-            ulong n2 = (y-1)*vol1->size[0]*vol1->size[1]+x*vol1->size[0]+slice;
-            ulong n3 = (y)  *vol1->size[0]*vol1->size[1]+(x+1)*vol1->size[0]+slice;
-            ulong n4 = (y)  *vol1->size[0]*vol1->size[1]+(x-1)*vol1->size[0]+slice;
+            size_t n1 = (size_t)(y+1)*vol1->size[0]*vol1->size[1]+x*vol1->size[0]+slice;
+            size_t n2 = (size_t)(y-1)*vol1->size[0]*vol1->size[1]+x*vol1->size[0]+slice;
+            size_t n3 = (size_t)(y)  *vol1->size[0]*vol1->size[1]+(x+1)*vol1->size[0]+slice;
+            size_t n4 = (size_t)(y)  *vol1->size[0]*vol1->size[1]+(x-1)*vol1->size[0]+slice;
             if (y+1 < vol1->size[2] && !done[n1]) {
               // check intensities at this location relative to first location
               float h[1];
@@ -1544,21 +1560,21 @@ void MainWindow::regionGrowing3(int posx, int posy, int slice) {  // slice is in
         }
       case MyPrimType::FLOAT : {
           float *d = (float *)vol1->dataPtr;
-          ulong idx = posy*vol1->size[0]*vol1->size[1]+posx*vol1->size[0]+slice;
+          size_t idx = (size_t)posy*vol1->size[0]*vol1->size[1]+posx*vol1->size[0]+slice;
           float start[1];
           start[0] = d[idx];
           done.set(idx);
           todo.push_back(idx);
-          for (ulong i = 0; i < todo.size(); i++) {
-            ulong here = todo.at(i);
+          for (size_t i = 0; i < todo.size(); i++) {
+            size_t here = todo.at(i);
             int y  = floor(here/(vol1->size[0]*vol1->size[1]));
             int x  = floor((here-(y*vol1->size[0]*vol1->size[1]))/vol1->size[0]);
             //int s  = here - (y*vol1->size[0]*vol1->size[1] + x * vol1->size[0]);
 
-            ulong n1 = (y+1)*vol1->size[0]*vol1->size[1]+x*vol1->size[0]+slice;
-            ulong n2 = (y-1)*vol1->size[0]*vol1->size[1]+x*vol1->size[0]+slice;
-            ulong n3 = (y)  *vol1->size[0]*vol1->size[1]+(x+1)*vol1->size[0]+slice;
-            ulong n4 = (y)  *vol1->size[0]*vol1->size[1]+(x-1)*vol1->size[0]+slice;
+            size_t n1 = (size_t)(y+1)*vol1->size[0]*vol1->size[1]+x*vol1->size[0]+slice;
+            size_t n2 = (size_t)(y-1)*vol1->size[0]*vol1->size[1]+x*vol1->size[0]+slice;
+            size_t n3 = (size_t)(y)  *vol1->size[0]*vol1->size[1]+(x+1)*vol1->size[0]+slice;
+            size_t n4 = (size_t)(y)  *vol1->size[0]*vol1->size[1]+(x-1)*vol1->size[0]+slice;
             if (y+1 < vol1->size[2] && !done[n1]) {
               // check intensities at this location relative to first location
               float h[1];
@@ -1603,17 +1619,17 @@ void MainWindow::regionGrowing3(int posx, int posy, int slice) {  // slice is in
         }
     }
     // now copy everything in done into the hbuffer
-    for (ulong i = 0; i < done.size(); i++) {
+    for (size_t i = 0; i < done.size(); i++) {
       if (done[i])
         hbuffer[i] = !isCtrl;
     }
   } else if (vol1->elementLength == 4) {
     boost::dynamic_bitset<> done(vol1->size[0]*vol1->size[1]*vol1->size[2]); // what was found
-    std::vector<ulong> todo; // helper array to keep track what needs to be added
+    std::vector<size_t> todo; // helper array to keep track what needs to be added
     switch(vol1->dataType) {
       case MyPrimType::UCHAR : {
         unsigned char *d = (unsigned char *)vol1->dataPtr;
-        ulong idx = posy*vol1->size[0]*vol1->size[1]+posx*vol1->size[0]+slice;
+        size_t idx = (size_t)posy*vol1->size[0]*vol1->size[1]+posx*vol1->size[0]+slice;
 
         float start[3];
         start[0] = d[4*idx+0];
@@ -1621,16 +1637,16 @@ void MainWindow::regionGrowing3(int posx, int posy, int slice) {  // slice is in
         start[2] = d[4*idx+2];
         done.set(idx);
         todo.push_back(idx);
-        for (ulong i = 0; i < todo.size(); i++) {
-          ulong here = todo.at(i);
+        for (size_t i = 0; i < todo.size(); i++) {
+          size_t here = todo.at(i);
           int y  = floor(here/(vol1->size[0]*vol1->size[1]));
           int x  = floor((here-(y*vol1->size[0]*vol1->size[1]))/vol1->size[0]);
           //int s  = here - (y*vol1->size[0]*vol1->size[1] + x * vol1->size[0]);
 
-          ulong n1 = (y+1)*vol1->size[0]*vol1->size[1]+x*vol1->size[0]+slice;
-          ulong n2 = (y-1)*vol1->size[0]*vol1->size[1]+x*vol1->size[0]+slice;
-          ulong n3 = (y)  *vol1->size[0]*vol1->size[1]+(x+1)*vol1->size[0]+slice;
-          ulong n4 = (y)  *vol1->size[0]*vol1->size[1]+(x-1)*vol1->size[0]+slice;
+          size_t n1 = (size_t)(y+1)*vol1->size[0]*vol1->size[1]+x*vol1->size[0]+slice;
+          size_t n2 = (size_t)(y-1)*vol1->size[0]*vol1->size[1]+x*vol1->size[0]+slice;
+          size_t n3 = (size_t)(y)  *vol1->size[0]*vol1->size[1]+(x+1)*vol1->size[0]+slice;
+          size_t n4 = (size_t)(y)  *vol1->size[0]*vol1->size[1]+(x-1)*vol1->size[0]+slice;
           if (y+1 < vol1->size[2] && !done[n1]) {
             // check intensities at this location relative to first location
             float h[3];
@@ -1688,7 +1704,7 @@ void MainWindow::regionGrowing3(int posx, int posy, int slice) {  // slice is in
         }
       case MyPrimType::FLOAT : {
         float *d = (float *)vol1->dataPtr;
-        ulong idx = posy*vol1->size[0]*vol1->size[1]+posx*vol1->size[0]+slice;
+        size_t idx = posy*vol1->size[0]*vol1->size[1]+posx*vol1->size[0]+slice;
 
         float start[3];
         start[0] = d[4*idx+0];
@@ -1696,16 +1712,16 @@ void MainWindow::regionGrowing3(int posx, int posy, int slice) {  // slice is in
         start[2] = d[4*idx+2];
         done.set(idx);
         todo.push_back(idx);
-        for (ulong i = 0; i < todo.size(); i++) {
-          ulong here = todo.at(i);
+        for (size_t i = 0; i < todo.size(); i++) {
+          size_t here = todo.at(i);
           int y  = floor(here/(vol1->size[0]*vol1->size[1]));
           int x  = floor((here-(y*vol1->size[0]*vol1->size[1]))/vol1->size[0]);
           //int s  = here - (y*vol1->size[0]*vol1->size[1] + x * vol1->size[0]);
 
-          ulong n1 = (y+1)*vol1->size[0]*vol1->size[1]+x*vol1->size[0]+slice;
-          ulong n2 = (y-1)*vol1->size[0]*vol1->size[1]+x*vol1->size[0]+slice;
-          ulong n3 = (y)  *vol1->size[0]*vol1->size[1]+(x+1)*vol1->size[0]+slice;
-          ulong n4 = (y)  *vol1->size[0]*vol1->size[1]+(x-1)*vol1->size[0]+slice;
+          size_t n1 = (size_t)(y+1)*vol1->size[0]*vol1->size[1]+x*vol1->size[0]+slice;
+          size_t n2 = (size_t)(y-1)*vol1->size[0]*vol1->size[1]+x*vol1->size[0]+slice;
+          size_t n3 = (size_t)(y)  *vol1->size[0]*vol1->size[1]+(x+1)*vol1->size[0]+slice;
+          size_t n4 = (size_t)(y)  *vol1->size[0]*vol1->size[1]+(x-1)*vol1->size[0]+slice;
           if (y+1 < vol1->size[2] && !done[n1]) {
             // check intensities at this location relative to first location
             float h[3];
@@ -1763,7 +1779,7 @@ void MainWindow::regionGrowing3(int posx, int posy, int slice) {  // slice is in
       }
     }
     // now copy everything in done into the hbuffer
-    for (ulong i = 0; i < done.size(); i++) {
+    for (size_t i = 0; i < done.size(); i++) {
       if (done[i])
         hbuffer[i] = !isCtrl;
     }
@@ -1915,6 +1931,7 @@ QStringList MainWindow::fetchModel(QString aString)
     nam->get(QNetworkRequest(url));
 
     return iStringList; */
+  return QStringList(); // return empty list for now
 }
 
 void MainWindow::finishedSlot(QNetworkReply* reply)
@@ -1968,10 +1985,17 @@ void MainWindow::LoadImage() {
                                                    rvolumes->at(1),
                                                    rvolumes->at(2),
                                                    rvolumes->at(3));
+      free(rvolumes->at(0)->dataPtr);
+      free(rvolumes->at(1)->dataPtr);
+      free(rvolumes->at(2)->dataPtr);
+      free(rvolumes->at(3)->dataPtr);
     } else if (rvolumes->size() == 3) {
       vol1 = (Volume *)rvolumes->at(0)->convertToColorVolume(rvolumes->at(0),
                                                              rvolumes->at(1),
                                                              rvolumes->at(2));
+      free(rvolumes->at(0)->dataPtr);
+      free(rvolumes->at(1)->dataPtr);
+      free(rvolumes->at(2)->dataPtr);
     } else if (rvolumes->size() == 1) {
       vol1 = (Volume *)rvolumes->at(0);
     }
@@ -2098,7 +2122,7 @@ void MainWindow::LoadLabel() {
   update();
 
 
-  hbuffer.resize( (ulong)lab1->size[0] * lab1->size[1] * lab1->size[2] );
+  hbuffer.resize( (size_t)lab1->size[0] * lab1->size[1] * lab1->size[2] );
 
   // append to list of loaded labels
   bool found = false;
@@ -2222,7 +2246,7 @@ void MainWindow::CreateLabel() {
   lab1->computeHist();
   getMaterialsFromLabel();
 
-  hbuffer.resize( (ulong)lab1->size[0] * lab1->size[1] * lab1->size[2] );
+  hbuffer.resize( (size_t)lab1->size[0] * lab1->size[1] * lab1->size[2] );
 
   // add to undo
   if (lab1) {
@@ -2250,7 +2274,7 @@ void MainWindow::createActions() {
 
 void MainWindow::about() {
   QMessageBox::about(this, tr("About Image Segmentation Editor"),
-                     tr("<p>The <b>Image Segmentation Editor v0.3</b> is an application that"
+                     tr("<p>The <b>Image Segmentation Editor v0.4</b> is an application that"
                         " supports image segmentation on multi-modal image data."
                         "</p><br/>Hauke Bartsch, Dr. rer. nat. 2013"));
 }
@@ -2267,12 +2291,12 @@ void MainWindow::FillHighlight(int which) {
   // use flood fill scanline method
   // start at the first voxel for the current slide
   if (which == 0) {
-    ulong offset = slicePosition[2] * (lab1->size[0]*lab1->size[1]);
+    size_t offset = slicePosition[2] * (lab1->size[0]*lab1->size[1]);
     for (int j = 0; j < lab1->size[1]; j++) {
       bool inside = false;
       bool firstFlip = false;
-      ulong start = -1;
-      ulong end   = -1;
+      size_t start = -1;
+      size_t end   = -1;
       for (int i = 0; i < lab1->size[0]; i++) {
         if (!inside) { // we are outside
           if (hbuffer[offset+j*lab1->size[0]+i] && !firstFlip) {
@@ -2286,11 +2310,11 @@ void MainWindow::FillHighlight(int which) {
             end = offset+j*lab1->size[0]+i;
             inside = false;
             // now fill the area between start end end
-            for (ulong k = start; k < end; k++) {
+            for (size_t k = start; k < end; k++) {
               hbuffer[k] = true;
             }
             // walk to the end of the border to be outside again
-            for (ulong k = end; k < offset+(j+1)*lab1->size[0]; k++) {
+            for (size_t k = end; k < offset+(j+1)*lab1->size[0]; k++) {
               if (!hbuffer[k]) {
                 i += (k-end);
                 break;
@@ -2389,17 +2413,17 @@ unsigned char * MainWindow::fillBuffer1(int pos, Volume *vol1, float alpha) {
 
   int numBytes = MyPrimType::getTypeSize(vol1->dataType);
   int numElements = vol1->elementLength;
-  long offset = pos*(vol1->size[0]*vol1->size[1])*numBytes*numElements;
+  size_t offset = pos*(vol1->size[0]*vol1->size[1])*numBytes*numElements;
 
   // create a correct buffer for the image (ARGB32)
   unsigned char *d = vol1->dataPtr + offset;
-  unsigned char *buffer = (unsigned char*)malloc(4 * vol1->size[0] * vol1->size[1]);
+  unsigned char *buffer = (unsigned char*)malloc(4 * (size_t)vol1->size[0] * vol1->size[1]);
   switch(vol1->dataType) {
     case MyPrimType::UCHAR :
     case MyPrimType::CHAR : {
         unsigned char *data = (unsigned char *)d;
         if (vol1->elementLength == 1) {
-          for (long i = 0; i < (long)vol1->size[0]*vol1->size[1]; i++) {
+          for (size_t i = 0; i < (size_t)vol1->size[0]*vol1->size[1]; i++) {
             double val = CLAMP((data[0] - windowLevel[0])/(windowLevel[1]-windowLevel[0])*255, 0, 255);
             buffer[i*4+0] = val; // blue
             buffer[i*4+1] = val; // green
@@ -2408,7 +2432,7 @@ unsigned char * MainWindow::fillBuffer1(int pos, Volume *vol1, float alpha) {
             data++;
           }
         } else if (vol1->elementLength == 4) {
-          for (long i = 0; i < (long)vol1->size[0]*vol1->size[1]; i++) {
+          for (size_t i = 0; i < (size_t)vol1->size[0]*vol1->size[1]; i++) {
             buffer[i*4+0] = CLAMP((data[2] - windowLevel[0])/(windowLevel[1]-windowLevel[0])*255, 0, 255);; // blue
             buffer[i*4+1] = CLAMP((data[1] - windowLevel[0])/(windowLevel[1]-windowLevel[0])*255, 0, 255);; // green
             buffer[i*4+2] = CLAMP((data[0] - windowLevel[0])/(windowLevel[1]-windowLevel[0])*255, 0, 255);; // red
@@ -2421,7 +2445,7 @@ unsigned char * MainWindow::fillBuffer1(int pos, Volume *vol1, float alpha) {
     case MyPrimType::SHORT : {
         signed short *data = (signed short *)d;
         if (vol1->elementLength == 1) {
-          for (long i = 0; i < (long)vol1->size[0]*vol1->size[1]; i++) {
+          for (size_t i = 0; i < (size_t)vol1->size[0]*vol1->size[1]; i++) {
             double val = CLAMP((data[0] - windowLevel[0])/(windowLevel[1]-windowLevel[0])*255, 0, 255);
             buffer[i*4+0] = val;
             buffer[i*4+1] = val;
@@ -2430,7 +2454,7 @@ unsigned char * MainWindow::fillBuffer1(int pos, Volume *vol1, float alpha) {
             data++;
           }
         } else if (vol1->elementLength == 4) {
-          for (long i = 0; i < (long)vol1->size[0]*vol1->size[1]; i++) {
+          for (size_t i = 0; i < (size_t)vol1->size[0]*vol1->size[1]; i++) {
             buffer[i*4+0] = CLAMP((data[2] - windowLevel[0])/(windowLevel[1]-windowLevel[0])*255, 0, 255);; // blue
             buffer[i*4+1] = CLAMP((data[1] - windowLevel[0])/(windowLevel[1]-windowLevel[0])*255, 0, 255);; // green
             buffer[i*4+2] = CLAMP((data[0] - windowLevel[0])/(windowLevel[1]-windowLevel[0])*255, 0, 255);; // red
@@ -2443,7 +2467,7 @@ unsigned char * MainWindow::fillBuffer1(int pos, Volume *vol1, float alpha) {
     case MyPrimType::USHORT : {
         unsigned short *data = (unsigned short *)d;
         if (vol1->elementLength == 1) {
-          for (long i = 0; i < (long)vol1->size[0]*vol1->size[1]; i++) {
+          for (size_t i = 0; i < (size_t)vol1->size[0]*vol1->size[1]; i++) {
             double val = CLAMP((data[0] - windowLevel[0])/(windowLevel[1]-windowLevel[0])*255, 0, 255);
             buffer[i*4+0] = val;
             buffer[i*4+1] = val;
@@ -2452,7 +2476,7 @@ unsigned char * MainWindow::fillBuffer1(int pos, Volume *vol1, float alpha) {
             data++;
           }
         } else if (vol1->elementLength == 4) {
-          for (long i = 0; i < (long)vol1->size[0]*vol1->size[1]; i++) {
+          for (size_t i = 0; i < (size_t)vol1->size[0]*vol1->size[1]; i++) {
             buffer[i*4+0] = CLAMP((data[2] - windowLevel[0])/(windowLevel[1]-windowLevel[0])*255, 0, 255);; // blue
             buffer[i*4+1] = CLAMP((data[1] - windowLevel[0])/(windowLevel[1]-windowLevel[0])*255, 0, 255);; // green
             buffer[i*4+2] = CLAMP((data[0] - windowLevel[0])/(windowLevel[1]-windowLevel[0])*255, 0, 255);; // red
@@ -2465,7 +2489,7 @@ unsigned char * MainWindow::fillBuffer1(int pos, Volume *vol1, float alpha) {
     case MyPrimType::INT : {
         signed int *data = (signed int *)d;
         if (vol1->elementLength == 1) {
-          for (long i = 0; i < (long)vol1->size[0]*vol1->size[1]; i++) {
+          for (size_t i = 0; i < (size_t)vol1->size[0]*vol1->size[1]; i++) {
             double val = CLAMP((data[0] - windowLevel[0])/(windowLevel[1]-windowLevel[0])*255, 0, 255);
             buffer[i*4+0] = val;
             buffer[i*4+1] = val;
@@ -2474,7 +2498,7 @@ unsigned char * MainWindow::fillBuffer1(int pos, Volume *vol1, float alpha) {
             data++;
           }
         } else if (vol1->elementLength == 4) {
-          for (long i = 0; i < (long)vol1->size[0]*vol1->size[1]; i++) {
+          for (size_t i = 0; i < (size_t)vol1->size[0]*vol1->size[1]; i++) {
             buffer[i*4+0] = CLAMP((data[2] - windowLevel[0])/(windowLevel[1]-windowLevel[0])*255, 0, 255);; // blue
             buffer[i*4+1] = CLAMP((data[1] - windowLevel[0])/(windowLevel[1]-windowLevel[0])*255, 0, 255);; // green
             buffer[i*4+2] = CLAMP((data[0] - windowLevel[0])/(windowLevel[1]-windowLevel[0])*255, 0, 255);; // red
@@ -2487,7 +2511,7 @@ unsigned char * MainWindow::fillBuffer1(int pos, Volume *vol1, float alpha) {
     case MyPrimType::UINT : {
         unsigned int *data = (unsigned int *)d;
         if (vol1->elementLength == 1) {
-          for (long i = 0; i < (long)vol1->size[0]*vol1->size[1]; i++) {
+          for (size_t i = 0; i < (size_t)vol1->size[0]*vol1->size[1]; i++) {
             double val = CLAMP((data[0] - windowLevel[0])/(windowLevel[1]-windowLevel[0])*255, 0, 255);
             buffer[i*4+0] = val;
             buffer[i*4+1] = val;
@@ -2496,7 +2520,7 @@ unsigned char * MainWindow::fillBuffer1(int pos, Volume *vol1, float alpha) {
             data++;
           }
         } else if (vol1->elementLength == 4) {
-          for (long i = 0; i < (long)vol1->size[0]*vol1->size[1]; i++) {
+          for (size_t i = 0; i < (size_t)vol1->size[0]*vol1->size[1]; i++) {
             buffer[i*4+0] = CLAMP((data[2] - windowLevel[0])/(windowLevel[1]-windowLevel[0])*255, 0, 255);; // blue
             buffer[i*4+1] = CLAMP((data[1] - windowLevel[0])/(windowLevel[1]-windowLevel[0])*255, 0, 255);; // green
             buffer[i*4+2] = CLAMP((data[0] - windowLevel[0])/(windowLevel[1]-windowLevel[0])*255, 0, 255);; // red
@@ -2509,7 +2533,7 @@ unsigned char * MainWindow::fillBuffer1(int pos, Volume *vol1, float alpha) {
     case MyPrimType::FLOAT : {
         float *data = (float *)d;
         if (vol1->elementLength == 1) {
-          for (long i = 0; i < (long)vol1->size[0]*vol1->size[1]; i++) {
+          for (size_t i = 0; i < (size_t)vol1->size[0]*vol1->size[1]; i++) {
             double val = CLAMP((data[0] - windowLevel[0])/(windowLevel[1]-windowLevel[0])*255, 0, 255);
             buffer[i*4+0] = val;
             buffer[i*4+1] = val;
@@ -2518,7 +2542,7 @@ unsigned char * MainWindow::fillBuffer1(int pos, Volume *vol1, float alpha) {
             data++;
           }
         } else if (vol1->elementLength == 4) {
-          for (long i = 0; i < (long)vol1->size[0]*vol1->size[1]; i++) {
+          for (size_t i = 0; i < (size_t)vol1->size[0]*vol1->size[1]; i++) {
             buffer[i*4+0] = CLAMP((data[2] - windowLevel[0])/(windowLevel[1]-windowLevel[0])*255, 0, 255);; // blue
             buffer[i*4+1] = CLAMP((data[1] - windowLevel[0])/(windowLevel[1]-windowLevel[0])*255, 0, 255);; // green
             buffer[i*4+2] = CLAMP((data[0] - windowLevel[0])/(windowLevel[1]-windowLevel[0])*255, 0, 255);; // red
@@ -2537,16 +2561,16 @@ unsigned char * MainWindow::fillBuffer1(int pos, Volume *vol1, float alpha) {
 unsigned char * MainWindow::fillBuffer1AsColor(int pos, ScalarVolume *vol1, float alpha) {
 
   int numBytes = MyPrimType::getTypeSize(vol1->dataType);
-  long offset = pos*(vol1->size[0]*vol1->size[1])*numBytes;
+  size_t offset = pos*(vol1->size[0]*vol1->size[1])*numBytes;
 
   // create a correct buffer for the image (ARGB32)
   unsigned char *d = vol1->dataPtr + offset;
-  unsigned char *buffer = (unsigned char*)malloc(4 * vol1->size[0] * vol1->size[1]);
+  unsigned char *buffer = (unsigned char*)malloc(4 * (size_t)vol1->size[0] * vol1->size[1]);
   switch(vol1->dataType) {
     case MyPrimType::UCHAR :
     case MyPrimType::CHAR : {
         unsigned char *data = (unsigned char *)d;
-        for (long i = 0; i < (long)vol1->size[0]*vol1->size[1]; i++) {
+        for (size_t i = 0; i < (size_t)vol1->size[0]*vol1->size[1]; i++) {
           buffer[i*4+0] = vol1->materialColors.at(data[0])->blue(); // blue
           buffer[i*4+1] = vol1->materialColors.at(data[0])->green(); // green
           buffer[i*4+2] = vol1->materialColors.at(data[0])->red(); // red
@@ -2557,7 +2581,7 @@ unsigned char * MainWindow::fillBuffer1AsColor(int pos, ScalarVolume *vol1, floa
       }
     case MyPrimType::SHORT : {
         signed short *data = (signed short *)d;
-        for (long i = 0; i < (long)vol1->size[0]*vol1->size[1]; i++) {
+        for (size_t i = 0; i < (size_t)vol1->size[0]*vol1->size[1]; i++) {
           buffer[i*4+0] = vol1->materialColors.at(data[0])->blue();
           buffer[i*4+1] = vol1->materialColors.at(data[0])->green();
           buffer[i*4+2] = vol1->materialColors.at(data[0])->red();
@@ -2568,7 +2592,7 @@ unsigned char * MainWindow::fillBuffer1AsColor(int pos, ScalarVolume *vol1, floa
       }
     case MyPrimType::USHORT : {
         unsigned short *data = (unsigned short *)d;
-        for (long i = 0; i < (long)vol1->size[0]*vol1->size[1]; i++) {
+        for (size_t i = 0; i < (size_t)vol1->size[0]*vol1->size[1]; i++) {
           buffer[i*4+0] = vol1->materialColors.at(data[0])->blue();
           buffer[i*4+1] = vol1->materialColors.at(data[0])->green();
           buffer[i*4+2] = vol1->materialColors.at(data[0])->red();
@@ -2579,7 +2603,7 @@ unsigned char * MainWindow::fillBuffer1AsColor(int pos, ScalarVolume *vol1, floa
       }
     case MyPrimType::INT : {
         signed int *data = (signed int *)d;
-        for (long i = 0; i < (long)vol1->size[0]*vol1->size[1]; i++) {
+        for (size_t i = 0; i < (size_t)vol1->size[0]*vol1->size[1]; i++) {
           buffer[i*4+0] = vol1->materialColors.at(data[0])->blue();
           buffer[i*4+1] = vol1->materialColors.at(data[0])->green();
           buffer[i*4+2] = vol1->materialColors.at(data[0])->red();
@@ -2590,7 +2614,7 @@ unsigned char * MainWindow::fillBuffer1AsColor(int pos, ScalarVolume *vol1, floa
       }
     case MyPrimType::UINT : {
         unsigned int *data = (unsigned int *)d;
-        for (long i = 0; i < (long)vol1->size[0]*vol1->size[1]; i++) {
+        for (size_t i = 0; i < (size_t)vol1->size[0]*vol1->size[1]; i++) {
           buffer[i*4+0] = vol1->materialColors.at(data[0])->blue();
           buffer[i*4+1] = vol1->materialColors.at(data[0])->green();
           buffer[i*4+2] = vol1->materialColors.at(data[0])->red();
@@ -2615,10 +2639,10 @@ unsigned char *MainWindow::fillBuffer2(int pos, Volume *vol1, float alpha) {
     case MyPrimType::UCHAR :
     case MyPrimType::CHAR : {
         unsigned char *data = (unsigned char *)d;
-        long count = 0;
+        size_t count = 0;
         if (vol1->elementLength == 1) {
-          for (long j = 0; j < vol1->size[2]; j++) {
-            for (long i = 0; i < vol1->size[0]; i++) {
+          for (size_t j = 0; j < vol1->size[2]; j++) {
+            for (size_t i = 0; i < vol1->size[0]; i++) {
               data = (unsigned char *)d;
               data += j*(vol1->size[0]*vol1->size[1])+pos*vol1->size[0]+i;
               double val = CLAMP((data[0] - windowLevel[0])/(windowLevel[1]-windowLevel[0])*255, 0, 255);
@@ -2630,8 +2654,8 @@ unsigned char *MainWindow::fillBuffer2(int pos, Volume *vol1, float alpha) {
             }
           }
         } else if (vol1->elementLength == 4) {
-          for (long j = 0; j < vol1->size[2]; j++) {
-            for (long i = 0; i < vol1->size[0]; i++) {
+          for (size_t j = 0; j < vol1->size[2]; j++) {
+            for (size_t i = 0; i < vol1->size[0]; i++) {
               data = (unsigned char *)d;
               data += 4*(j*(vol1->size[0]*vol1->size[1])+pos*vol1->size[0]+i);
               buffer[count*4+0] = CLAMP((data[2] - windowLevel[0])/(windowLevel[1]-windowLevel[0])*255, 0, 255);
@@ -2647,10 +2671,10 @@ unsigned char *MainWindow::fillBuffer2(int pos, Volume *vol1, float alpha) {
       }
     case MyPrimType::SHORT : {
         signed short *data = (signed short *)d;
-        long count = 0;
+        size_t count = 0;
         if (vol1->elementLength == 1) {
-          for (long j = 0; j < vol1->size[2]; j++) {
-            for (long i = 0; i < vol1->size[0]; i++) {
+          for (size_t j = 0; j < vol1->size[2]; j++) {
+            for (size_t i = 0; i < vol1->size[0]; i++) {
               data = (signed short *)d;
               data += j*(vol1->size[0]*vol1->size[1])+pos*vol1->size[0]+i;
               double val = CLAMP((data[0] - windowLevel[0])/(windowLevel[1]-windowLevel[0])*255, 0, 255);
@@ -2662,8 +2686,8 @@ unsigned char *MainWindow::fillBuffer2(int pos, Volume *vol1, float alpha) {
             }
           }
         } else if (vol1->elementLength == 4) {
-          for (long j = 0; j < vol1->size[2]; j++) {
-            for (long i = 0; i < vol1->size[0]; i++) {
+          for (size_t j = 0; j < vol1->size[2]; j++) {
+            for (size_t i = 0; i < vol1->size[0]; i++) {
               data = (signed short *)d;
               data += 4*(j*(vol1->size[0]*vol1->size[1])+pos*vol1->size[0]+i);
               buffer[count*4+0] = CLAMP((data[2] - windowLevel[0])/(windowLevel[1]-windowLevel[0])*255, 0, 255);
@@ -2679,10 +2703,10 @@ unsigned char *MainWindow::fillBuffer2(int pos, Volume *vol1, float alpha) {
       }
     case MyPrimType::USHORT : {
         unsigned short *data = (unsigned short *)d;
-        long count = 0;
+        size_t count = 0;
         if (vol1->elementLength == 1) {
-          for (long j = 0; j < vol1->size[2]; j++) {
-            for (long i = 0; i < vol1->size[0]; i++) {
+          for (size_t j = 0; j < vol1->size[2]; j++) {
+            for (size_t i = 0; i < vol1->size[0]; i++) {
               data = (unsigned short *)d;
               data += j*(vol1->size[0]*vol1->size[1])+pos*vol1->size[0]+i;
               double val = CLAMP((data[0] - windowLevel[0])/(windowLevel[1]-windowLevel[0])*255, 0, 255);
@@ -2694,8 +2718,8 @@ unsigned char *MainWindow::fillBuffer2(int pos, Volume *vol1, float alpha) {
             }
           }
         } else if (vol1->elementLength == 4) {
-          for (long j = 0; j < vol1->size[2]; j++) {
-            for (long i = 0; i < vol1->size[0]; i++) {
+          for (size_t j = 0; j < vol1->size[2]; j++) {
+            for (size_t i = 0; i < vol1->size[0]; i++) {
               data = (unsigned short *)d;
               data += 4*(j*(vol1->size[0]*vol1->size[1])+pos*vol1->size[0]+i);
               buffer[count*4+0] = CLAMP((data[2] - windowLevel[0])/(windowLevel[1]-windowLevel[0])*255, 0, 255);
@@ -2711,10 +2735,10 @@ unsigned char *MainWindow::fillBuffer2(int pos, Volume *vol1, float alpha) {
       }
     case MyPrimType::INT : {
         signed int *data = (signed int *)d;
-        long count = 0;
+        size_t count = 0;
         if (vol1->elementLength == 1) {
-          for (long j = 0; j < vol1->size[2]; j++) {
-            for (long i = 0; i < vol1->size[0]; i++) {
+          for (size_t j = 0; j < vol1->size[2]; j++) {
+            for (size_t i = 0; i < vol1->size[0]; i++) {
               data = (int *)d;
               data += j*(vol1->size[0]*vol1->size[1])+pos*vol1->size[0]+i;
               double val = CLAMP((data[0] - windowLevel[0])/(windowLevel[1]-windowLevel[0])*255, 0, 255);
@@ -2726,8 +2750,8 @@ unsigned char *MainWindow::fillBuffer2(int pos, Volume *vol1, float alpha) {
             }
           }
         } else if (vol1->elementLength == 4) {
-          for (long j = 0; j < vol1->size[2]; j++) {
-            for (long i = 0; i < vol1->size[0]; i++) {
+          for (size_t j = 0; j < vol1->size[2]; j++) {
+            for (size_t i = 0; i < vol1->size[0]; i++) {
               data = (int *)d;
               data += 4*(j*(vol1->size[0]*vol1->size[1])+pos*vol1->size[0]+i);
               buffer[count*4+0] = CLAMP((data[2] - windowLevel[0])/(windowLevel[1]-windowLevel[0])*255, 0, 255);
@@ -2743,10 +2767,10 @@ unsigned char *MainWindow::fillBuffer2(int pos, Volume *vol1, float alpha) {
       }
     case MyPrimType::UINT : {
         unsigned int *data = (unsigned int *)d;
-        long count = 0;
+        size_t count = 0;
         if (vol1->elementLength == 1) {
-          for (long j = 0; j < vol1->size[2]; j++) {
-            for (long i = 0; i < vol1->size[0]; i++) {
+          for (size_t j = 0; j < vol1->size[2]; j++) {
+            for (size_t i = 0; i < vol1->size[0]; i++) {
               data = (unsigned int *)d;
               data += j*(vol1->size[0]*vol1->size[1])+pos*vol1->size[0]+i;
               double val = CLAMP((data[0] - windowLevel[0])/(windowLevel[1]-windowLevel[0])*255, 0, 255);
@@ -2758,8 +2782,8 @@ unsigned char *MainWindow::fillBuffer2(int pos, Volume *vol1, float alpha) {
             }
           }
         } else if (vol1->elementLength == 4) {
-          for (long j = 0; j < vol1->size[2]; j++) {
-            for (long i = 0; i < vol1->size[0]; i++) {
+          for (size_t j = 0; j < vol1->size[2]; j++) {
+            for (size_t i = 0; i < vol1->size[0]; i++) {
               data = (unsigned int *)d;
               data += 4*(j*(vol1->size[0]*vol1->size[1])+pos*vol1->size[0]+i);
               buffer[count*4+0] = CLAMP((data[2] - windowLevel[0])/(windowLevel[1]-windowLevel[0])*255, 0, 255);
@@ -2775,10 +2799,10 @@ unsigned char *MainWindow::fillBuffer2(int pos, Volume *vol1, float alpha) {
       }
     case MyPrimType::FLOAT : {
         float *data = (float *)d;
-        long count = 0;
+        size_t count = 0;
         if (vol1->elementLength == 1) {
-          for (long j = 0; j < vol1->size[2]; j++) {
-            for (long i = 0; i < vol1->size[0]; i++) {
+          for (size_t j = 0; j < vol1->size[2]; j++) {
+            for (size_t i = 0; i < vol1->size[0]; i++) {
               data = (float *)d;
               data += j*(vol1->size[0]*vol1->size[1])+pos*vol1->size[0]+i;
               double val = CLAMP((data[0] - windowLevel[0])/(windowLevel[1]-windowLevel[0])*255, 0, 255);
@@ -2790,8 +2814,8 @@ unsigned char *MainWindow::fillBuffer2(int pos, Volume *vol1, float alpha) {
             }
           }
         } else if (vol1->elementLength == 4) {
-          for (long j = 0; j < vol1->size[2]; j++) {
-            for (long i = 0; i < vol1->size[0]; i++) {
+          for (size_t j = 0; j < vol1->size[2]; j++) {
+            for (size_t i = 0; i < vol1->size[0]; i++) {
               data = (float *)d;
               data += 4*(j*(vol1->size[0]*vol1->size[1])+pos*vol1->size[0]+i);
               buffer[count*4+0] = CLAMP((data[2] - windowLevel[0])/(windowLevel[1]-windowLevel[0])*255, 0, 255);
@@ -2818,9 +2842,9 @@ unsigned char *MainWindow::fillBuffer2AsColor(int pos, ScalarVolume *vol1, float
     case MyPrimType::UCHAR :
     case MyPrimType::CHAR : {
         unsigned char *data = (unsigned char *)d;
-        long count = 0;
-        for (long j = 0; j < vol1->size[2]; j++) {
-          for (long i = 0; i < vol1->size[0]; i++) {
+        size_t count = 0;
+        for (size_t j = 0; j < vol1->size[2]; j++) {
+          for (size_t i = 0; i < vol1->size[0]; i++) {
             data = (unsigned char *)d;
             data += j*(vol1->size[0]*vol1->size[1])+pos*vol1->size[0]+i;
             buffer[count*4+0] = vol1->materialColors.at(data[0])->blue();
@@ -2834,9 +2858,9 @@ unsigned char *MainWindow::fillBuffer2AsColor(int pos, ScalarVolume *vol1, float
       }
     case MyPrimType::SHORT : {
         signed short *data = (signed short *)d;
-        long count = 0;
-        for (long j = 0; j < vol1->size[2]; j++) {
-          for (long i = 0; i < vol1->size[0]; i++) {
+        size_t count = 0;
+        for (size_t j = 0; j < vol1->size[2]; j++) {
+          for (size_t i = 0; i < vol1->size[0]; i++) {
             data = (signed short *)d;
             data += j*(vol1->size[0]*vol1->size[1])+pos*vol1->size[0]+i;
             buffer[count*4+0] = vol1->materialColors.at(data[0])->blue();
@@ -2850,9 +2874,9 @@ unsigned char *MainWindow::fillBuffer2AsColor(int pos, ScalarVolume *vol1, float
       }
     case MyPrimType::USHORT : {
         unsigned short *data = (unsigned short *)d;
-        long count = 0;
-        for (long j = 0; j < vol1->size[2]; j++) {
-          for (long i = 0; i < vol1->size[0]; i++) {
+        size_t count = 0;
+        for (size_t j = 0; j < vol1->size[2]; j++) {
+          for (size_t i = 0; i < vol1->size[0]; i++) {
             data = (unsigned short *)d;
             data += j*(vol1->size[0]*vol1->size[1])+pos*vol1->size[0]+i;
             buffer[count*4+0] = vol1->materialColors.at(data[0])->blue();
@@ -2866,9 +2890,9 @@ unsigned char *MainWindow::fillBuffer2AsColor(int pos, ScalarVolume *vol1, float
       }
     case MyPrimType::INT : {
         signed int *data = (signed int *)d;
-        long count = 0;
-        for (long j = 0; j < vol1->size[2]; j++) {
-          for (long i = 0; i < vol1->size[0]; i++) {
+        size_t count = 0;
+        for (size_t j = 0; j < vol1->size[2]; j++) {
+          for (size_t i = 0; i < vol1->size[0]; i++) {
             data = (int *)d;
             data += j*(vol1->size[0]*vol1->size[1])+pos*vol1->size[0]+i;
             buffer[count*4+0] = vol1->materialColors.at(data[0])->blue();
@@ -2882,9 +2906,9 @@ unsigned char *MainWindow::fillBuffer2AsColor(int pos, ScalarVolume *vol1, float
       }
     case MyPrimType::UINT : {
         unsigned int *data = (unsigned int *)d;
-        long count = 0;
-        for (long j = 0; j < vol1->size[2]; j++) {
-          for (long i = 0; i < vol1->size[0]; i++) {
+        size_t count = 0;
+        for (size_t j = 0; j < vol1->size[2]; j++) {
+          for (size_t i = 0; i < vol1->size[0]; i++) {
             data = (unsigned int *)d;
             data += j*(vol1->size[0]*vol1->size[1])+pos*vol1->size[0]+i;
             buffer[count*4+0] = vol1->materialColors.at(data[0])->blue();
@@ -2907,18 +2931,18 @@ unsigned char *MainWindow::fillBuffer2AsColor(int pos, ScalarVolume *vol1, float
 // create a label field from the volume
 unsigned char * MainWindow::fillBuffer1FromHBuffer(int pos, ScalarVolume *vol1, float alpha) {
 
-  if ((ulong)lab1->size[0]* lab1->size[1] * lab1->size[2] !=
+  if ((size_t)lab1->size[0]* lab1->size[1] * lab1->size[2] !=
       hbuffer.size()) {
     fprintf(stderr, "Error: hbuffer does not have same size as volume");
     return NULL;
   }
   int numBytes = MyPrimType::getTypeSize(vol1->dataType);
-  long offset = pos*(vol1->size[0]*vol1->size[1])*numBytes;
+  size_t offset = pos*(vol1->size[0]*vol1->size[1])*numBytes;
 
   // create a correct buffer for the image (ARGB32)
   unsigned char *buffer = (unsigned char*)malloc(4 * vol1->size[0] * vol1->size[1]);
 
-  for (long i = 0; i < (long)vol1->size[0]*vol1->size[1]; i++) {
+  for (size_t i = 0; i < (size_t)vol1->size[0]*vol1->size[1]; i++) {
     buffer[i*4+0] = 0; // blue
     buffer[i*4+1] = 0; // green
     buffer[i*4+2] = (int)hbuffer[i+offset] * 255; // red
@@ -2931,7 +2955,7 @@ unsigned char * MainWindow::fillBuffer1FromHBuffer(int pos, ScalarVolume *vol1, 
 // create a label field from the volume
 unsigned char * MainWindow::fillBuffer2FromHBuffer(int pos, ScalarVolume *vol1, float alpha) {
 
-  if ((ulong)lab1->size[0]* lab1->size[1] * lab1->size[2] !=
+  if ((size_t)lab1->size[0]* lab1->size[1] * lab1->size[2] !=
       hbuffer.size()) {
     fprintf(stderr, "Error: hbuffer does not have same size as volume");
     return NULL;
@@ -2941,8 +2965,8 @@ unsigned char * MainWindow::fillBuffer2FromHBuffer(int pos, ScalarVolume *vol1, 
 
   for (int j = 0; j < vol1->size[2]; j++) {
     for (int i = 0; i < vol1->size[0]; i++) {
-      ulong idx = j*(vol1->size[0]*vol1->size[1])+pos*vol1->size[0]+i;
-      ulong idx2 = j*vol1->size[0]+i;
+      size_t idx = j*(vol1->size[0]*vol1->size[1])+pos*vol1->size[0]+i;
+      size_t idx2 = j*vol1->size[0]+i;
       buffer[idx2*4+0] = 0; // blue
       buffer[idx2*4+1] = 0; // green
       buffer[idx2*4+2] = (int)hbuffer[idx] * 255; // red
@@ -2955,7 +2979,7 @@ unsigned char * MainWindow::fillBuffer2FromHBuffer(int pos, ScalarVolume *vol1, 
 // create a label field from the volume
 unsigned char * MainWindow::fillBuffer3FromHBuffer(int pos, ScalarVolume *vol1, float alpha) {
 
-  if ((ulong)lab1->size[0]* lab1->size[1] * lab1->size[2] !=
+  if ((size_t)lab1->size[0]* lab1->size[1] * lab1->size[2] !=
       hbuffer.size()) {
     fprintf(stderr, "Error: hbuffer does not have same size as volume");
     return NULL;
@@ -2967,8 +2991,8 @@ unsigned char * MainWindow::fillBuffer3FromHBuffer(int pos, ScalarVolume *vol1, 
   // todo: use loop over bitfield instead
   for (int j = 0; j < vol1->size[2]; j++) {
     for (int i = 0; i < vol1->size[1]; i++) {
-      ulong idx = j*(vol1->size[0]*vol1->size[1])+i*vol1->size[0]+pos;
-      ulong idx2 = j*vol1->size[1]+i;
+      size_t idx = j*(vol1->size[0]*vol1->size[1])+i*vol1->size[0]+pos;
+      size_t idx2 = j*vol1->size[1]+i;
       buffer[idx2*4+0] = 0; // blue
       buffer[idx2*4+1] = 0; // green
       buffer[idx2*4+2] = (int)hbuffer[idx] * 255; // red
@@ -2986,10 +3010,10 @@ unsigned char *MainWindow::fillBuffer3(int pos, Volume *vol1, float alpha) {
     case MyPrimType::UCHAR :
     case MyPrimType::CHAR : {
         unsigned char *data = (unsigned char *)d;
-        long count = 0;
+        size_t count = 0;
         if (vol1->elementLength == 1) {
-          for (long j = 0; j < vol1->size[2]; j++) {
-            for (long i = 0; i < vol1->size[1]; i++) {
+          for (size_t j = 0; j < vol1->size[2]; j++) {
+            for (size_t i = 0; i < vol1->size[1]; i++) {
               data = (unsigned char *)d;
               data += j*(vol1->size[0]*vol1->size[1])+i*vol1->size[0]+pos;
               double val = CLAMP((data[0] - windowLevel[0])/(windowLevel[1]-windowLevel[0])*255, 0, 255);
@@ -3001,8 +3025,8 @@ unsigned char *MainWindow::fillBuffer3(int pos, Volume *vol1, float alpha) {
             }
           }
         } else if (vol1->elementLength == 4) {
-          for (long j = 0; j < vol1->size[2]; j++) {
-            for (long i = 0; i < vol1->size[1]; i++) {
+          for (size_t j = 0; j < vol1->size[2]; j++) {
+            for (size_t i = 0; i < vol1->size[1]; i++) {
               data = (unsigned char *)d;
               data += 4*(j*(vol1->size[0]*vol1->size[1])+i*vol1->size[0]+pos);
               buffer[count*4+0] = CLAMP((data[2] - windowLevel[0])/(windowLevel[1]-windowLevel[0])*255, 0, 255);
@@ -3017,10 +3041,10 @@ unsigned char *MainWindow::fillBuffer3(int pos, Volume *vol1, float alpha) {
       }
     case MyPrimType::SHORT : {
         signed short *data = (signed short *)d;
-        long count = 0;
+        size_t count = 0;
         if (vol1->elementLength == 1) {
-          for (long j = 0; j < vol1->size[2]; j++) {
-            for (long i = 0; i < vol1->size[0]; i++) {
+          for (size_t j = 0; j < vol1->size[2]; j++) {
+            for (size_t i = 0; i < vol1->size[0]; i++) {
               data = (signed short *)d;
               data += j*(vol1->size[0]*vol1->size[1])+i*vol1->size[0]+pos;
               double val = CLAMP((data[0] - windowLevel[0])/(windowLevel[1]-windowLevel[0])*255, 0, 255);
@@ -3032,8 +3056,8 @@ unsigned char *MainWindow::fillBuffer3(int pos, Volume *vol1, float alpha) {
             }
           }
         } else if (vol1->elementLength == 4) {
-          for (long j = 0; j < vol1->size[2]; j++) {
-            for (long i = 0; i < vol1->size[1]; i++) {
+          for (size_t j = 0; j < vol1->size[2]; j++) {
+            for (size_t i = 0; i < vol1->size[1]; i++) {
               data = (signed short *)d;
               data += 4*(j*(vol1->size[0]*vol1->size[1])+i*vol1->size[0]+pos);
               buffer[count*4+0] = CLAMP((data[2] - windowLevel[0])/(windowLevel[1]-windowLevel[0])*255, 0, 255);
@@ -3048,10 +3072,10 @@ unsigned char *MainWindow::fillBuffer3(int pos, Volume *vol1, float alpha) {
       }
     case MyPrimType::USHORT : {
         unsigned short *data = (unsigned short *)d;
-        long count = 0;
+        size_t count = 0;
         if (vol1->elementLength == 1) {
-          for (long j = 0; j < vol1->size[2]; j++) {
-            for (long i = 0; i < vol1->size[0]; i++) {
+          for (size_t j = 0; j < vol1->size[2]; j++) {
+            for (size_t i = 0; i < vol1->size[0]; i++) {
               data = (unsigned short *)d;
               data += j*(vol1->size[0]*vol1->size[1])+i*vol1->size[0]+pos;
               double val = CLAMP((data[0] - windowLevel[0])/(windowLevel[1]-windowLevel[0])*255, 0, 255);
@@ -3063,8 +3087,8 @@ unsigned char *MainWindow::fillBuffer3(int pos, Volume *vol1, float alpha) {
             }
           }
         } else if (vol1->elementLength == 4) {
-          for (long j = 0; j < vol1->size[2]; j++) {
-            for (long i = 0; i < vol1->size[1]; i++) {
+          for (size_t j = 0; j < vol1->size[2]; j++) {
+            for (size_t i = 0; i < vol1->size[1]; i++) {
               data = (unsigned short *)d;
               data += 4*(j*(vol1->size[0]*vol1->size[1])+i*vol1->size[0]+pos);
               buffer[count*4+0] = CLAMP((data[2] - windowLevel[0])/(windowLevel[1]-windowLevel[0])*255, 0, 255);
@@ -3079,10 +3103,10 @@ unsigned char *MainWindow::fillBuffer3(int pos, Volume *vol1, float alpha) {
       }
     case MyPrimType::INT : {
         signed int *data = (signed int *)d;
-        long count = 0;
+        size_t count = 0;
         if (vol1->elementLength == 1) {
-          for (long j = 0; j < vol1->size[2]; j++) {
-            for (long i = 0; i < vol1->size[0]; i++) {
+          for (size_t j = 0; j < vol1->size[2]; j++) {
+            for (size_t i = 0; i < vol1->size[0]; i++) {
               data = (int *)d;
               data += j*(vol1->size[0]*vol1->size[1])+i*vol1->size[0]+pos;
               double val = CLAMP((data[0] - windowLevel[0])/(windowLevel[1]-windowLevel[0])*255, 0, 255);
@@ -3094,8 +3118,8 @@ unsigned char *MainWindow::fillBuffer3(int pos, Volume *vol1, float alpha) {
             }
           }
         } else if (vol1->elementLength == 4) {
-          for (long j = 0; j < vol1->size[2]; j++) {
-            for (long i = 0; i < vol1->size[1]; i++) {
+          for (size_t j = 0; j < vol1->size[2]; j++) {
+            for (size_t i = 0; i < vol1->size[1]; i++) {
               data = (int *)d;
               data += 4*(j*(vol1->size[0]*vol1->size[1])+i*vol1->size[0]+pos);
               buffer[count*4+0] = CLAMP((data[2] - windowLevel[0])/(windowLevel[1]-windowLevel[0])*255, 0, 255);
@@ -3110,10 +3134,10 @@ unsigned char *MainWindow::fillBuffer3(int pos, Volume *vol1, float alpha) {
       }
     case MyPrimType::UINT : {
         unsigned int *data = (unsigned int *)d;
-        long count = 0;
+        size_t count = 0;
         if (vol1->elementLength == 1) {
-          for (long j = 0; j < vol1->size[2]; j++) {
-            for (long i = 0; i < vol1->size[0]; i++) {
+          for (size_t j = 0; j < vol1->size[2]; j++) {
+            for (size_t i = 0; i < vol1->size[0]; i++) {
               data = (unsigned int *)d;
               data += j*(vol1->size[0]*vol1->size[1])+i*vol1->size[0]+pos;
               double val = CLAMP((data[0] - windowLevel[0])/(windowLevel[1]-windowLevel[0])*255, 0, 255);
@@ -3125,8 +3149,8 @@ unsigned char *MainWindow::fillBuffer3(int pos, Volume *vol1, float alpha) {
             }
           }
         } else if (vol1->elementLength == 4) {
-          for (long j = 0; j < vol1->size[2]; j++) {
-            for (long i = 0; i < vol1->size[1]; i++) {
+          for (size_t j = 0; j < vol1->size[2]; j++) {
+            for (size_t i = 0; i < vol1->size[1]; i++) {
               data = (unsigned int *)d;
               data += 4*(j*(vol1->size[0]*vol1->size[1])+i*vol1->size[0]+pos);
               buffer[count*4+0] = CLAMP((data[2] - windowLevel[0])/(windowLevel[1]-windowLevel[0])*255, 0, 255);
@@ -3141,10 +3165,10 @@ unsigned char *MainWindow::fillBuffer3(int pos, Volume *vol1, float alpha) {
       }
     case MyPrimType::FLOAT : {
         float *data = (float *)d;
-        long count = 0;
+        size_t count = 0;
         if (vol1->elementLength == 1) {
-          for (long j = 0; j < vol1->size[2]; j++) {
-            for (long i = 0; i < vol1->size[0]; i++) {
+          for (size_t j = 0; j < vol1->size[2]; j++) {
+            for (size_t i = 0; i < vol1->size[0]; i++) {
               data = (float *)d;
               data += j*(vol1->size[0]*vol1->size[1])+i*vol1->size[0]+pos;
               double val = CLAMP((data[0] - windowLevel[0])/(windowLevel[1]-windowLevel[0])*255, 0, 255);
@@ -3156,8 +3180,8 @@ unsigned char *MainWindow::fillBuffer3(int pos, Volume *vol1, float alpha) {
             }
           }
         } else if (vol1->elementLength == 4) {
-          for (long j = 0; j < vol1->size[2]; j++) {
-            for (long i = 0; i < vol1->size[1]; i++) {
+          for (size_t j = 0; j < vol1->size[2]; j++) {
+            for (size_t i = 0; i < vol1->size[1]; i++) {
               data = (float *)d;
               data += 4*(j*(vol1->size[0]*vol1->size[1])+i*vol1->size[0]+pos);
               buffer[count*4+0] = CLAMP((data[2] - windowLevel[0])/(windowLevel[1]-windowLevel[0])*255, 0, 255);
@@ -3183,9 +3207,9 @@ unsigned char *MainWindow::fillBuffer3AsColor(int pos, ScalarVolume *vol1, float
     case MyPrimType::UCHAR :
     case MyPrimType::CHAR : {
         unsigned char *data = (unsigned char *)d;
-        long count = 0;
-        for (long j = 0; j < vol1->size[2]; j++) {
-          for (long i = 0; i < vol1->size[1]; i++) {
+        size_t count = 0;
+        for (size_t j = 0; j < vol1->size[2]; j++) {
+          for (size_t i = 0; i < vol1->size[1]; i++) {
             data = (unsigned char *)d;
             data += j*(vol1->size[0]*vol1->size[1])+i*vol1->size[0]+pos;
             buffer[count*4+0] = vol1->materialColors.at(data[0])->blue();
@@ -3199,9 +3223,9 @@ unsigned char *MainWindow::fillBuffer3AsColor(int pos, ScalarVolume *vol1, float
       }
     case MyPrimType::SHORT : {
         signed short *data = (signed short *)d;
-        long count = 0;
-        for (long j = 0; j < vol1->size[2]; j++) {
-          for (long i = 0; i < vol1->size[0]; i++) {
+        size_t count = 0;
+        for (size_t j = 0; j < vol1->size[2]; j++) {
+          for (size_t i = 0; i < vol1->size[0]; i++) {
             data = (signed short *)d;
             data += j*(vol1->size[0]*vol1->size[1])+i*vol1->size[0]+pos;
             buffer[count*4+0] = vol1->materialColors.at(data[0])->blue();
@@ -3215,9 +3239,9 @@ unsigned char *MainWindow::fillBuffer3AsColor(int pos, ScalarVolume *vol1, float
       }
     case MyPrimType::USHORT : {
         unsigned short *data = (unsigned short *)d;
-        long count = 0;
-        for (long j = 0; j < vol1->size[2]; j++) {
-          for (long i = 0; i < vol1->size[0]; i++) {
+        size_t count = 0;
+        for (size_t j = 0; j < vol1->size[2]; j++) {
+          for (size_t i = 0; i < vol1->size[0]; i++) {
             data = (unsigned short *)d;
             data += j*(vol1->size[0]*vol1->size[1])+i*vol1->size[0]+pos;
             buffer[count*4+0] = vol1->materialColors.at(data[0])->blue();
@@ -3231,9 +3255,9 @@ unsigned char *MainWindow::fillBuffer3AsColor(int pos, ScalarVolume *vol1, float
       }
     case MyPrimType::INT : {
         signed int *data = (signed int *)d;
-        long count = 0;
-        for (long j = 0; j < vol1->size[2]; j++) {
-          for (long i = 0; i < vol1->size[0]; i++) {
+        size_t count = 0;
+        for (size_t j = 0; j < vol1->size[2]; j++) {
+          for (size_t i = 0; i < vol1->size[0]; i++) {
             data = (int *)d;
             data += j*(vol1->size[0]*vol1->size[1])+i*vol1->size[0]+pos;
             buffer[count*4+0] = vol1->materialColors.at(data[0])->blue();
@@ -3247,9 +3271,9 @@ unsigned char *MainWindow::fillBuffer3AsColor(int pos, ScalarVolume *vol1, float
       }
     case MyPrimType::UINT : {
         unsigned int *data = (unsigned int *)d;
-        long count = 0;
-        for (long j = 0; j < vol1->size[2]; j++) {
-          for (long i = 0; i < vol1->size[0]; i++) {
+        size_t count = 0;
+        for (size_t j = 0; j < vol1->size[2]; j++) {
+          for (size_t i = 0; i < vol1->size[0]; i++) {
             data = (unsigned int *)d;
             data += j*(vol1->size[0]*vol1->size[1])+i*vol1->size[0]+pos;
             buffer[count*4+0] = vol1->materialColors.at(data[0])->blue();
@@ -3530,7 +3554,7 @@ void MainWindow::on_pushButton_5_clicked()
     }
 
     // we want to add the currently highlighted material to the buffer
-    for (ulong i = 0; i < (ulong)lab1->size[0] * lab1->size[1] * lab1->size[2]; i++) {
+    for (size_t i = 0; i < (size_t)lab1->size[0] * lab1->size[1] * lab1->size[2]; i++) {
       if (lab1->dataPtr[i] == materialIdx)
         hbuffer[i] = true;
     }
