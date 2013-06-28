@@ -26,6 +26,8 @@ class UndoRedo
         // we can have changes on volumes and changes on buffers all need to go into the undo chain
         void add(Volume *vol) { // add a volume to undo
           // make a copy of the volume and add to
+          if (!vol)
+            return;
           Volume *volCopy = vol->duplicate();
           undoVolumes.push_back(volCopy);
           std::vector<int> *t = new std::vector<int>();
@@ -53,6 +55,8 @@ class UndoRedo
           currentStep = undoList.size()-1;
         }
         void add(boost::dynamic_bitset<> *buffer) { // add a buffer to undo
+          if (!buffer)
+            return;
           boost::dynamic_bitset<> *bufCopy = new boost::dynamic_bitset<>(*buffer); // should make a copy of the buffer
           undoBuffer.push_back(bufCopy);
           std::vector<int> *t = new std::vector<int>();
@@ -85,6 +89,8 @@ class UndoRedo
           currentStep = undoList.size()-1;
         }
         void add(boost::dynamic_bitset<> *buffer, Volume *vol) { // add a buffer to undo
+          if (!buffer || !vol)
+            return;
           boost::dynamic_bitset<> *bufCopy = new boost::dynamic_bitset<>(*buffer); // should make a copy of the buffer
           undoBuffer.push_back(bufCopy);
           Volume *volCopy = vol->duplicate();

@@ -1,6 +1,8 @@
 #ifndef PREFERENCES_H
 #define PREFERENCES_H
 
+#include <QString>
+#include <QStringList>
 #include <QDialog>
 
 namespace Ui {
@@ -16,9 +18,24 @@ public:
   ~Preferences();
   
   int undoSteps();  /// return number of undo steps
+  int brushSize();  /// return the current brush size
+  bool isAutoSaveLabel(); /// return if we auto save images
+  QStringList getRecentFiles();
+  void addToRecentFiles( QString str );
+  QStringList getRecentLabels();
+  void addToRecentLabels( QString str );
+  int getMaxNumberRecentFiles();
 
 private slots:
   void on_preferences_undoSteps_valueChanged(int arg1);
+
+  void on_preferences_brushSize_editingFinished();
+
+  void on_preferences_brushSize_valueChanged(int arg1);
+
+  void on_autoSaveLabels_toggled(bool checked);
+
+  void on_preferences_NumberRecentFiles_valueChanged(int arg1);
 
 private:
   Ui::Preferences *ui;

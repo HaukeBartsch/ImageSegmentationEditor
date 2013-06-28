@@ -146,6 +146,7 @@ bool ReadMGZ::save(Volume *vol) {
   h2.tr = 0;
   fwrite(&h2, 1, sizeof(endHeader), fp);
   fclose(fp);
+  vol->filename = this->filename;
 
   return true;
 }

@@ -63,5 +63,7 @@ int main(int argc, char *argv[])
     segmentationEditor.show();
     app.installEventFilter( new EventProcessing( &segmentationEditor ) );
     // segmentationEditor.LoadImage();
+
+    // QApplication::setStyleSheet();
     return app.exec();
 }

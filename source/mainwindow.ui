@@ -15,9 +15,10 @@
   </property>
   <property name="styleSheet">
    <string notr="true">#centralwidget {
-background: #333333;
-border: none;
-border-right: 1px solid black;
+	font: 13pt &quot;Cambria&quot;;
+    background: #333333;
+    border: none;
+    border-right: 1px solid black;
 }
 #menubar {
 background: #555555;
@@ -489,11 +490,23 @@ border-right: 1px solid black;
     <property name="title">
      <string>File</string>
     </property>
+    <widget class="QMenu" name="menuRecent_Files">
+     <property name="title">
+      <string>Recent Files</string>
+     </property>
+    </widget>
+    <widget class="QMenu" name="menuRecent_Label">
+     <property name="title">
+      <string>Recent Label</string>
+     </property>
+    </widget>
     <addaction name="actionLoad_Image"/>
     <addaction name="actionLoad_Label"/>
     <addaction name="actionSave_Label"/>
     <addaction name="actionCreate_New_Label"/>
     <addaction name="actionPreferences"/>
+    <addaction name="menuRecent_Files"/>
+    <addaction name="menuRecent_Label"/>
    </widget>
    <widget class="QMenu" name="menuAbout">
     <property name="title">
@@ -507,6 +520,7 @@ border-right: 1px solid black;
     </property>
     <addaction name="actionUndo"/>
     <addaction name="actionRedo"/>
+    <addaction name="actionSnapshots"/>
    </widget>
    <addaction name="menuLoad"/>
    <addaction name="menuEdit"/>
@@ -557,6 +571,21 @@ border-right: 1px solid black;
   <action name="actionPreferences">
    <property name="text">
     <string>Preferences</string>
+   </property>
+  </action>
+  <action name="actionEmpty">
+   <property name="text">
+    <string>empty</string>
+   </property>
+  </action>
+  <action name="actionEmpty_2">
+   <property name="text">
+    <string>empty</string>
+   </property>
+  </action>
+  <action name="actionSnapshots">
+   <property name="text">
+    <string>Snapshots</string>
    </property>
   </action>
  </widget>

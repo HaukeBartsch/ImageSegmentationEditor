@@ -7,12 +7,15 @@
 #include <QJsonObject>
 #include <QTextStream>
 #include <QGLWidget>
+#include <QFileInfo>
 #include <QGraphicsRectItem>
 #include <QtNetwork/QNetworkRequest>
 
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
 #include "undoredo.h"
+#include "Types.h"
+#include "exportsnapshots.h"
 #include "readmgz.h"
 
 MainWindow::MainWindow(QWidget *parent) :
@@ -75,7 +78,7 @@ MainWindow::MainWindow(QWidget *parent) :
   qsrand(1234);
   currentTool = None;
 
-  BrushToolRadius = 0;
+  BrushToolWidth = 0;
   this->setWindowTitle(QString("Image Segmentation Editor"));
 
   QSettings settings;
@@ -90,11 +93,61 @@ MainWindow::MainWindow(QWidget *parent) :
   firstUndoStepDone = false;
 
   preferencesDialog = new Preferences();
+
+  // recent files
+  QStringList files = preferencesDialog->getRecentFiles();
+  for (int i = 0; i < files.size(); i++) {
+    // create a new action
+    QAction *action = new QAction((files[i]), this);
+    if (!action)
+      continue;
+    action->setData( files[i] );
+    //QLabel *label = new QLabel(files[i]);
+    connect(action, SIGNAL(triggered()), this, SLOT(loadThisFile()));
+    ui->menuRecent_Files->addAction(action);
+  }
+  // recent files
+  files = preferencesDialog->getRecentLabels();
+  for (int i = 0; i < files.size(); i++) {
+    // create a new action
+    QAction *action = new QAction((files[i]), this);
+    if (!action)
+      continue;
+    action->setData( files[i] );
+    //QLabel *label = new QLabel(files[i]);
+    connect(action, SIGNAL(triggered()), this, SLOT(loadThisLabel()));
+    ui->menuRecent_Label->addAction(action);
+  }
 }
 
 MainWindow::~MainWindow()
 {
   delete ui;
+}
+
+// for the current menu item, get the filename and load it
+void MainWindow::loadThisFile( ) {
+  QAction *pAction = qobject_cast<QAction*>(sender());
+  if (!pAction)
+    return;
+  QString filename = pAction->data().toString();
+  loadRecentFile( filename );
+}
+
+// for the current menu item, get the filename and load it
+void MainWindow::loadThisLabel( ) {
+  QAction *pAction = qobject_cast<QAction*>(sender());
+  if (!pAction)
+    return;
+  QString filename = pAction->data().toString();
+  loadRecentLabel( filename );
+}
+
+void MainWindow::loadRecentFile( QString fileName ) {
+  LoadImageFromFile( fileName );
+}
+void MainWindow::loadRecentLabel( QString fileName ) {
+  LoadLabelFromFile( fileName );
 }
 
 void MainWindow::undo() {
@@ -147,6 +200,20 @@ void MainWindow::redo() {
         lab1 = UndoRedo::getInstance().getVolume();
     }
     update();
+  }
+}
+
+// find out if we autosave is enabled, save the volume
+void MainWindow::autoSave() {
+  if (!lab1)
+    return;
+  if (preferencesDialog->isAutoSaveLabel()) {
+    QFileInfo f(lab1->filename);
+    if (f.exists() && f.isWritable()) {
+       SaveLabel(lab1->filename); // save again
+    } else {
+      fprintf(stderr, "Error: auto-save could not write the file %s", lab1->filename.toLatin1().data());
+    }
   }
 }
 
@@ -238,16 +305,17 @@ bool MainWindow::myKeyPressEvent(QObject *object, QKeyEvent *keyEvent) {
   }
   keyEvent->accept();
 
+  // does not work because with Shift the key is a different key
   if (currentTool == MainWindow::BrushTool && keyEvent->key() == Qt::Key_0 && isShift)
-    BrushToolRadius = 0;
+    BrushToolWidth = 0;
   if (currentTool == MainWindow::BrushTool && keyEvent->key() == Qt::Key_1 && isShift)
-    BrushToolRadius = 1;
+    BrushToolWidth = 1;
   if (currentTool == MainWindow::BrushTool && keyEvent->key() == Qt::Key_2 && isShift)
-    BrushToolRadius = 2;
+    BrushToolWidth = 2;
   if (currentTool == MainWindow::BrushTool && keyEvent->key() == Qt::Key_3 && isShift)
-    BrushToolRadius = 3;
+    BrushToolWidth = 3;
   if (currentTool == MainWindow::BrushTool && keyEvent->key() == Qt::Key_4 && isShift)
-    BrushToolRadius = 4;
+    BrushToolWidth = 4;
   if (keyEvent->key() == Qt::Key_1 && !isShift) {
     if (volumes.size() >= 1) {
       vol1 = volumes[0];
@@ -433,6 +501,7 @@ bool MainWindow::myMouseReleaseEvent ( QObject *object, QMouseEvent * e ) {
     return false;
 
   if (currentTool == MainWindow::BrushTool) {
+    BrushToolWidth = preferencesDialog->brushSize();
     setHighlightBuffer(object, e);
     // add to undo
     UndoRedo::getInstance().add(&hbuffer);
@@ -464,8 +533,10 @@ void MainWindow::myMousePressEvent ( QObject *object, QMouseEvent * e ) {
   int posx = floor( e->pos().x() / scaleFactor1);
   int posy = floor( e->pos().y() / scaleFactor1);
 
-  if (currentTool == MainWindow::BrushTool)
+  if (currentTool == MainWindow::BrushTool) {
+    BrushToolWidth = preferencesDialog->brushSize();
     setHighlightBuffer(object, e);
+  }
   if (currentTool == MainWindow::MagicWandTool && object == Image1) {
     regionGrowing(posx, posy, slicePosition[2]);
     update();
@@ -496,24 +567,77 @@ void MainWindow::setHighlightBuffer(QObject *object, QMouseEvent *e) {
     int posy = floor( e->pos().y() / scaleFactor1);
 
     bool isCtrl = QApplication::keyboardModifiers() & Qt::ControlModifier;
-    int radius = BrushToolRadius;
-    for (int i = posx-radius; i <= posx+radius; i++) {    // 2
-      for (int j = posy-radius; j <= posy+radius; j++) {  // 1
+    switch(BrushToolWidth) {
+      case 1:
+        for (int i = 0; i < brushShapePixel[BrushToolWidth-1]*2; i+=2) {
+          hbuffer[slicePosition[2]*(lab1->size[0]*lab1->size[1]) + (posy+brushShape1[i])*lab1->size[0] + posx+brushShape1[i+1]] = !isCtrl;
+        }
+        break;
+      case 2:
+        for (int i = 0; i < brushShapePixel[BrushToolWidth-1]*2; i+=2) {
+          hbuffer[slicePosition[2]*(lab1->size[0]*lab1->size[1]) + (posy+brushShape2[i])*lab1->size[0] + posx+brushShape2[i+1]] = !isCtrl;
+        }
+        break;
+      case 3:
+        for (int i = 0; i < brushShapePixel[BrushToolWidth-1]*2; i+=2) {
+          hbuffer[slicePosition[2]*(lab1->size[0]*lab1->size[1]) + (posy+brushShape3[i])*lab1->size[0] + posx+brushShape3[i+1]] = !isCtrl;
+        }
+        break;
+      case 4:
+        for (int i = 0; i < brushShapePixel[BrushToolWidth-1]*2; i+=2) {
+          hbuffer[slicePosition[2]*(lab1->size[0]*lab1->size[1]) + (posy+brushShape4[i])*lab1->size[0] + posx+brushShape4[i+1]] = !isCtrl;
+        }
+        break;
+      default:
+        fprintf(stderr, "error: brush shape not defined yet");
+        break;
+    }
+
+  /*  int radius = ceil(BrushToolWidth/2.0);
+    for (int i = posx-radius; i < posx+radius; i++) {    // 2
+      for (int j = posy-radius; j < posy+radius; j++) {  // 1
         hbuffer[slicePosition[2]*(lab1->size[0]*lab1->size[1]) + j*lab1->size[0] + i] = !isCtrl;
       }
-    }
+    } */
     update();
   } else if (object == Image2) {
     int posx = floor( e->pos().x() / scaleFactor23);
     int posy = floor( e->pos().y() / scaleFactor23);
 
     bool isCtrl = QApplication::keyboardModifiers() & Qt::ControlModifier;
-    int radius = BrushToolRadius;
+
+    switch(BrushToolWidth) {
+      case 1:
+        for (int i = 0; i < brushShapePixel[BrushToolWidth-1]*2; i+=2) {
+          hbuffer[(posy+brushShape1[i])*(lab1->size[0]*lab1->size[1]) + slicePosition[1]*lab1->size[0] + posx+brushShape1[i+1]] = !isCtrl;
+        }
+        break;
+      case 2:
+        for (int i = 0; i < brushShapePixel[BrushToolWidth-1]*2; i+=2) {
+          hbuffer[(posy+brushShape2[i])*(lab1->size[0]*lab1->size[1]) + slicePosition[1]*lab1->size[0] + posx+brushShape2[i+1]] = !isCtrl;
+        }
+        break;
+      case 3:
+        for (int i = 0; i < brushShapePixel[BrushToolWidth-1]*2; i+=2) {
+          hbuffer[(posy+brushShape3[i])*(lab1->size[0]*lab1->size[1]) + slicePosition[1]*lab1->size[0] + posx+brushShape3[i+1]] = !isCtrl;
+        }
+        break;
+      case 4:
+        for (int i = 0; i < brushShapePixel[BrushToolWidth-1]*2; i+=2) {
+          hbuffer[(posy+brushShape4[i])*(lab1->size[0]*lab1->size[1]) + slicePosition[1]*lab1->size[0] + posx+brushShape4[i+1]] = !isCtrl;
+        }
+        break;
+      default:
+        fprintf(stderr, "error: brush shape not defined yet");
+        break;
+    }
+
+/*    int radius = BrushToolWidth/2-1;
     for (int i = posx-radius; i <= posx+radius; i++) {  // 2
       for (int j = posy-radius; j <= posy+radius; j++) { // 0
         hbuffer[j*(lab1->size[0]*lab1->size[1]) + slicePosition[1]*lab1->size[0] + i] = !isCtrl;
       }
-    }
+    } */
     update();
 
   } else if (object == Image3) {
@@ -521,12 +645,39 @@ void MainWindow::setHighlightBuffer(QObject *object, QMouseEvent *e) {
     int posy = floor( e->pos().y() / scaleFactor23);
 
     bool isCtrl = QApplication::keyboardModifiers() & Qt::ControlModifier;
-    int radius = BrushToolRadius;
+
+    switch(BrushToolWidth) {
+      case 1:
+        for (int i = 0; i < brushShapePixel[BrushToolWidth-1]*2; i+=2) {
+          hbuffer[(posy+brushShape1[i])*(lab1->size[0]*lab1->size[1]) + (posx+brushShape1[i+1])*lab1->size[0] + slicePosition[0]] = !isCtrl;
+        }
+        break;
+      case 2:
+        for (int i = 0; i < brushShapePixel[BrushToolWidth-1]*2; i+=2) {
+          hbuffer[(posy+brushShape2[i])*(lab1->size[0]*lab1->size[1]) + (posx+brushShape2[i+1])*lab1->size[0] + slicePosition[0]] = !isCtrl;
+        }
+        break;
+      case 3:
+        for (int i = 0; i < brushShapePixel[BrushToolWidth-1]*2; i+=2) {
+          hbuffer[(posy+brushShape3[i])*(lab1->size[0]*lab1->size[1]) + (posx+brushShape3[i+1])*lab1->size[0] + slicePosition[0]] = !isCtrl;
+        }
+        break;
+      case 4:
+        for (int i = 0; i < brushShapePixel[BrushToolWidth-1]*2; i+=2) {
+          hbuffer[(posy+brushShape4[i])*(lab1->size[0]*lab1->size[1]) + (posx+brushShape4[i+1])*lab1->size[0] + slicePosition[0]] = !isCtrl;
+        }
+        break;
+      default:
+        fprintf(stderr, "error: brush shape not defined yet");
+        break;
+    }
+
+    /* int radius = BrushToolWidth/2-1;
     for (int i = posx-radius; i <= posx+radius; i++) {   //
       for (int j = posy-radius; j <= posy+radius; j++) { //
         hbuffer[j*(lab1->size[0]*lab1->size[1]) + i*lab1->size[0] + slicePosition[0]] = !isCtrl;
       }
-    }
+    } */
     update();
   }
 
@@ -594,6 +745,7 @@ bool MainWindow::mouseEvent(QObject *object, QMouseEvent *e) {
   } else if (mouseIsDown && currentTool == MainWindow::BrushTool) {
     if (!lab1)
       return false;
+    BrushToolWidth = preferencesDialog->brushSize();
     setHighlightBuffer(object, e);
     // add to undo
     //UndoRedo::getInstance().add(&hbuffer);
@@ -1967,9 +2119,25 @@ void MainWindow::finishedSlot(QNetworkReply* reply)
 
 void MainWindow::LoadImage() {
 
-  QString fileName = QFileDialog::getOpenFileName(this,
-                                                  tr("Open File"), currentPath.absolutePath());
-  if (!fileName.isEmpty()) {
+  /* QString fileName = QFileDialog::getOpenFileName(this,
+                                                  tr("Open File"), currentPath.absolutePath()); */
+  QFileDialog dialog(this);
+  dialog.setDirectory( currentPath );
+  dialog.setFileMode(QFileDialog::ExistingFiles);
+  dialog.setNameFilter(trUtf8("Splits (*.mgh)"));
+  QStringList fileNames;
+  if (dialog.exec()) {
+    fileNames = dialog.selectedFiles();
+    for ( int i = 0; i < fileNames.size(); i++) {
+      QString fileName = fileNames[i];
+      if (!fileName.isEmpty()) {
+        LoadImageFromFile( fileName );
+      }
+    }
+  }
+}
+
+void MainWindow::LoadImageFromFile( QString fileName ) {
     // set current path to new location
     currentPath.setPath( currentPath.filePath(fileName) );
     ReadMGZ *reader = new ReadMGZ(fileName);
@@ -2031,7 +2199,7 @@ void MainWindow::LoadImage() {
 
     ui->windowLevelHistogram->setViewport( new QGLWidget() ); // makes the graphics window much much faster
     showHistogram(vol1, ui->windowLevelHistogram);
-  }
+    preferencesDialog->addToRecentFiles(vol1->filename);
 }
 
 // draw the histogram
@@ -2102,6 +2270,11 @@ void MainWindow::LoadLabel() {
     fprintf(stderr, "no file selected");
     return;
   }
+  LoadLabelFromFile(fileName);
+}
+
+void MainWindow::LoadLabelFromFile( QString fileName ) {
+
   ReadMGZ *reader = new ReadMGZ(fileName);
   std::vector<ScalarVolume *> *rvolumes = reader->getVolume();
   if (!rvolumes || rvolumes->size() < 1) {
@@ -2175,13 +2348,21 @@ void MainWindow::LoadLabel() {
   // add to undo
   UndoRedo::getInstance().add(&hbuffer, lab1);
   firstUndoStepDone = false;
+
+  preferencesDialog->addToRecentLabels(lab1->filename);
 }
 
-void MainWindow::SaveLabel() {
+void MainWindow::SaveLabelAskForName() {
   if (!lab1)
     return; // do nothing
   QString fileName = QFileDialog::getSaveFileName(this,
-                                                  tr("Save File"), currentPath.absolutePath());
+                                                  tr("Save Label File"), currentPath.absolutePath());
+  SaveLabel(fileName);
+}
+
+void MainWindow::SaveLabel(QString fileName) {
+  if (!lab1)
+    return; // do nothing
   if (!fileName.isEmpty()) {
     ((ScalarVolume *)lab1)->saveAs(fileName);
 
@@ -2230,6 +2411,30 @@ void MainWindow::SaveLabel() {
   }
 }
 
+void MainWindow::snapshot( QString filename ) {
+   // save the current image under this name
+   // which image?
+  if (ui->scrollArea_4->widget() == Image1) {
+    const QPixmap *pm = Image1->pixmap();
+    pm->save(filename, "png");
+  } else if (ui->scrollArea_4->widget() == Image2) {
+    const QPixmap *pm = Image2->pixmap();
+    pm->save(filename, "png");
+  } else if (ui->scrollArea_4->widget() == Image3) {
+    const QPixmap *pm = Image3->pixmap();
+    pm->save(filename, "png");
+  }
+}
+
+void MainWindow::setMainWindowPos( int pos ) {
+  if (ui->scrollArea_4->widget() == Image1) {
+    slicePosition[2] = pos;
+  } else if (ui->scrollArea_4->widget() == Image2) {
+    slicePosition[1] = pos;
+  } else if (ui->scrollArea_4->widget() == Image3) {
+    slicePosition[0] = pos;
+  }
+}
 
 void MainWindow::CreateLabel() {
   if (!vol1) {
@@ -2248,6 +2453,8 @@ void MainWindow::CreateLabel() {
 
   hbuffer.resize( (size_t)lab1->size[0] * lab1->size[1] * lab1->size[2] );
 
+  SaveLabelAskForName(); // store the label field for auto-save to work we need the file name
+
   // add to undo
   if (lab1) {
     UndoRedo::getInstance().add(&hbuffer, lab1);
@@ -2260,7 +2467,7 @@ void MainWindow::createActions() {
   connect(ui->actionLoad_Image, SIGNAL(triggered()), this, SLOT(LoadImage()));
 
   ui->actionSave_Label->setShortcut(tr("Ctrl+S"));
-  connect(ui->actionSave_Label, SIGNAL(triggered()), this, SLOT(SaveLabel()));
+  connect(ui->actionSave_Label, SIGNAL(triggered()), this, SLOT(SaveLabelAskForName()));
 
   ui->actionLoad_Label->setShortcut(tr("Ctrl+L"));
   connect(ui->actionLoad_Label, SIGNAL(triggered()), this, SLOT(LoadLabel()));
@@ -2270,11 +2477,37 @@ void MainWindow::createActions() {
 
   ui->actionImage_Segmentation_Editor->setShortcut(tr("Ctrl+A"));
   connect(ui->actionImage_Segmentation_Editor, SIGNAL(triggered()), this, SLOT(about()));
+
+  ui->actionSnapshots->setShortcut(tr("Ctrl+P"));
+  connect(ui->actionSnapshots, SIGNAL(triggered()), this, SLOT(createSnapshots()));
+
+}
+
+void MainWindow::createSnapshots() {
+  // open the dialog
+  if (!vol1)
+    return; // we have to have a volume loaded
+
+  ExportSnapshots *ss = new ExportSnapshots(this);
+  if (ui->scrollArea_4->widget() == Image1) {
+    ss->setMinMax( 0, vol1->size[2]-1 );
+    ss->setStop( vol1->size[2]-1 );
+  } else if (ui->scrollArea_4->widget() == Image2) {
+    ss->setMinMax( 0, vol1->size[1]-1 );
+    ss->setStop( vol1->size[1]-1 );
+  } else if (ui->scrollArea_4->widget() == Image3) {
+    ss->setMinMax( 0, vol1->size[0]-1 );
+    ss->setStop( vol1->size[0]-1 );
+  }
+  ss->setStart( 0 );
+  ss->setStep( 1 );
+
+  ss->show();
 }
 
 void MainWindow::about() {
   QMessageBox::about(this, tr("About Image Segmentation Editor"),
-                     tr("<p>The <b>Image Segmentation Editor v0.4</b> is an application that"
+                     tr("<p>The <b>Image Segmentation Editor v0.6</b> is an application that"
                         " supports image segmentation on multi-modal image data."
                         "</p><br/>Hauke Bartsch, Dr. rer. nat. 2013"));
 }
@@ -3292,22 +3525,29 @@ unsigned char *MainWindow::fillBuffer3AsColor(int pos, ScalarVolume *vol1, float
   return buffer;
 }
 
-
-
 void MainWindow::updateImage1(int pos) {
-
-  unsigned char *buffer1 = NULL;
+  //static int lastPos;
+  unsigned char *buffer1 = NULL;// buffer11;
   unsigned char *buffer2 = NULL;
   unsigned char *buffer3 = NULL;
+  //if (lastPos != pos) {
   buffer1 = fillBuffer1(pos, vol1, 255);
+  //   buffer11 = buffer1;
+  //}
+  if (!buffer1)
+    return;
   QImage imageVol1(buffer1, vol1->size[0], vol1->size[1], QImage::Format_ARGB32);
   QImage resultImage(imageVol1); //  = QImage(imageVol1.size(), QImage::Format_ARGB32_Premultiplied);
 
   if (lab1 != NULL && lab1->elementLength == 1) {
     buffer2 = fillBuffer1AsColor(pos, (ScalarVolume *)lab1, 180);
+    if (!buffer2)
+      return;
     QImage imageLab1(buffer2, lab1->size[0], lab1->size[1], QImage::Format_ARGB32);
 
     buffer3 = fillBuffer1FromHBuffer(pos, (ScalarVolume *)lab1, 180);
+    if (!buffer3)
+      return;
     QImage imageHBuffer1(buffer3, lab1->size[0], lab1->size[1], QImage::Format_ARGB32);
 
     // QPainter::CompositionMode mode = QPainter::CompositionMode_Overlay;
@@ -3351,15 +3591,21 @@ void MainWindow::updateImage2(int pos) { // [x, 0, z]
   unsigned char *buffer2 = NULL;
   unsigned char *buffer3 = NULL;
   buffer1 = fillBuffer2(pos, vol1, 255);
+  if (!buffer1)
+    return;
   QImage imageVol1(buffer1, vol1->size[0], vol1->size[2], QImage::Format_ARGB32);
   QImage resultImage(imageVol1);
   // resultImage = QImage(imageVol1.size(), QImage::Format_ARGB32_Premultiplied);
 
   if (lab1 != NULL && lab1->elementLength == 1) {
     buffer2 = fillBuffer2AsColor(pos, (ScalarVolume *)lab1, 128);
+    if (!buffer2)
+      return;
     QImage imageLab1(buffer2, lab1->size[0], lab1->size[2], QImage::Format_ARGB32);
 
     buffer3 = fillBuffer2FromHBuffer(pos, (ScalarVolume *)lab1, 180);
+    if (!buffer3)
+      return;
     QImage imageHBuffer2(buffer3, lab1->size[0], lab1->size[2], QImage::Format_ARGB32);
 
     //QPainter::CompositionMode mode = QPainter::CompositionMode_Overlay;
@@ -3398,14 +3644,20 @@ void MainWindow::updateImage3(int pos) { // [0, y, z]
   unsigned char *buffer3 = NULL;
 
   buffer1 = fillBuffer3(pos, vol1, 255);
+  if (!buffer1)
+    return;
   QImage imageVol1(buffer1, vol1->size[1], vol1->size[2], QImage::Format_ARGB32);
   QImage resultImage(imageVol1);
 
   if (lab1 != NULL && lab1->elementLength == 1) {
     buffer2 = fillBuffer3AsColor(pos, (ScalarVolume *)lab1, 128);
+    if (!buffer2)
+      return;
     QImage imageLab1(buffer2, lab1->size[1], lab1->size[2], QImage::Format_ARGB32);
 
     buffer3 = fillBuffer3FromHBuffer(pos, (ScalarVolume *)lab1, 180);
+    if (!buffer3)
+      return;
     QImage imageHBuffer3(buffer3, lab1->size[1], lab1->size[2], QImage::Format_ARGB32);
 
     // QPainter::CompositionMode mode = QPainter::CompositionMode_Overlay;
@@ -3498,6 +3750,7 @@ void MainWindow::on_toolButton_4_clicked()
     update();
 
     UndoRedo::getInstance().add(&hbuffer, lab1);
+    autoSave();
     firstUndoStepDone = false;
   }
 }
@@ -3517,6 +3770,7 @@ void MainWindow::on_toolButton_5_clicked()
   update();
 
   UndoRedo::getInstance().add(&hbuffer, lab1);
+  autoSave();
   firstUndoStepDone = false;
 }
 

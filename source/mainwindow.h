@@ -39,15 +39,26 @@ public:
     void myMouseButtonDblClick(QObject *object, QMouseEvent *mouseEvent);
     void redo();
     void undo();
+    void LoadImageFromFile( QString fileName );
+    void LoadLabelFromFile( QString fileName );
+    std::vector<int> slicePosition;
+    void update();
+    void updateImage1(int pos);
+    void updateImage2(int pos);
+    void updateImage3(int pos);
+    void snapshot( QString filename );
+    void setMainWindowPos( int pos );
+
 
 private slots:
     void on_pushButton_clicked();
 
     void on_pushButton_2_clicked();
 
-    void LoadLabel();
-    void SaveLabel();
+    void SaveLabel(QString filename);
+    void SaveLabelAskForName();
     void CreateLabel();
+    void autoSave();
 
     void on_pushButton_3_clicked();
 
@@ -72,6 +83,8 @@ private slots:
 
     void about();
 
+    void createSnapshots();
+
     void on_pushButton_5_clicked();
 
     void on_zoomToggle_toggled(bool checked);
@@ -91,7 +104,12 @@ private slots:
     void on_actionPreferences_triggered();
 
 public slots:
+    void loadRecentFile( QString fileName );
+    void loadThisFile();
+    void loadRecentLabel( QString fileName );
+    void loadThisLabel();
     void LoadImage();
+    void LoadLabel();
     void closeEvent(QCloseEvent *event);
 
 private:
@@ -103,10 +121,6 @@ private:
     QAction *normalSizeAct;
     QAction *fitToWindowAct;
     void updateActions();
-    void update();
-    void updateImage1(int pos);
-    void updateImage2(int pos);
-    void updateImage3(int pos);
 
     QList<QTreeWidgetItem *> materials;
 
@@ -123,7 +137,6 @@ private:
     QLabel *Image2;
     QLabel *Image3;
 
-    std::vector<int> slicePosition;
     float windowLevel[2];
     float windowLevelOverlay[2];
     // each dataset has also a currentWindowLevel, if you change windowLevel change that one as well
@@ -166,7 +179,7 @@ private:
     };
 
     Tools currentTool;
-    int BrushToolRadius;
+    int BrushToolWidth;
     QDir currentPath;
     void regionGrowing(int posx, int posy, int slice);
     void regionGrowing2(int posx, int posy, int slice);
