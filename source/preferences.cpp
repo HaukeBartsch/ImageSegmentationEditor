@@ -8,6 +8,13 @@ Preferences::Preferences(QWidget *parent) :
   ui(new Ui::Preferences)
 {
   ui->setupUi(this);
+
+  // set the values in the dialog to the currently active settings
+  QSettings settings;
+  ui->GrayLowValue->setValue( settings.value("Preferences/grayLowValue", 0.05).toDouble() );
+  ui->GrayHighValue->setValue( settings.value("Preferences/grayHighValue", 0.99).toDouble() );
+  ui->ColorLowValue->setValue( settings.value("Preferences/colorLowValue", 0.05).toDouble() );
+  ui->ColorHighValue->setValue( settings.value("Preferences/colorHighValue", 0.9999).toDouble() );
 }
 
 Preferences::~Preferences()
@@ -95,7 +102,6 @@ void Preferences::addToRecentLabels( QString str ) {
   settings.setValue("Preferences/recentLabels", now );
 }
 
-
 bool Preferences::isAutoSaveLabel() {
   QSettings settings;
   return settings.value("Preferences/autoSaveLabel", 1).toInt();
@@ -113,9 +119,51 @@ int Preferences::getMaxNumberRecentFiles() {
   return settings.value("Preferences/maxNumberRecentFiles", 20).toInt();
 }
 
+
 // change number of recent files
 void Preferences::on_preferences_NumberRecentFiles_valueChanged(int arg1)
 {
   QSettings settings;
   settings.setValue("Preferences/maxNumberRecentFiles", arg1);
+}
+
+void Preferences::on_GrayLowValue_valueChanged(double arg1)
+{
+  QSettings settings;
+  settings.setValue("Preferences/grayLowValue", arg1);
+}
+
+void Preferences::on_GrayHighValue_valueChanged(double arg1)
+{
+  QSettings settings;
+  settings.setValue("Preferences/grayHighValue", arg1);
+}
+
+void Preferences::on_ColorLowValue_valueChanged(double arg1)
+{
+  QSettings settings;
+  settings.setValue("Preferences/colorLowValue", arg1);
+}
+
+void Preferences::on_ColorHighValue_valueChanged(double arg1)
+{
+  QSettings settings;
+  settings.setValue("Preferences/colorHighValue", arg1);
+}
+
+float Preferences::getGrayLowValue() {
+  QSettings settings;
+  return settings.value("Preferences/grayLowValue", 0.05).toDouble();
+}
+float Preferences::getGrayHighValue() {
+  QSettings settings;
+  return settings.value("Preferences/grayHighValue", 0.99).toDouble();
+}
+float Preferences::getColorLowValue() {
+  QSettings settings;
+  return settings.value("Preferences/colorLowValue", 0.05).toDouble();
+}
+float Preferences::getColorHighValue() {
+  QSettings settings;
+  return settings.value("Preferences/colorHighValue", 0.9999).toDouble();
 }

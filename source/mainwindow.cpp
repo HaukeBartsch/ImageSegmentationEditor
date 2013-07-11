@@ -17,6 +17,7 @@
 #include "Types.h"
 #include "exportsnapshots.h"
 #include "readmgz.h"
+#include "setbrightnesscontrast.h"
 
 MainWindow::MainWindow(QWidget *parent) :
   QMainWindow(parent),
@@ -731,6 +732,10 @@ bool MainWindow::mouseEvent(QObject *object, QMouseEvent *e) {
     // fprintf(stderr, "window level change: %f %f", windowLevel[0], windowLevel[1]);
     vol1->currentWindowLevel[0] = windowLevel[0];
     vol1->currentWindowLevel[1] = windowLevel[1];
+
+    ui->label->setText(QString("range: %1...%2")
+        .arg( vol1->currentWindowLevel[0] )
+        .arg( vol1->currentWindowLevel[1] ));
 
     update();
   } else if (mouseIsDown && currentTool == MainWindow::ZoomTool) {
@@ -2130,6 +2135,7 @@ void MainWindow::LoadImage() {
     fileNames = dialog.selectedFiles();
     for ( int i = 0; i < fileNames.size(); i++) {
       QString fileName = fileNames[i];
+      ui->statusbar->setEnabled(true);
       if (!fileName.isEmpty()) {
         LoadImageFromFile( fileName );
       }
@@ -2147,6 +2153,7 @@ void MainWindow::LoadImageFromFile( QString fileName ) {
       return;
     }
 
+    ui->statusbar->showMessage(QString("Loading ") + fileName + QString("..."), 3000);
     if (rvolumes->size() == 4) {
       ScalarVolume *first = (ScalarVolume *)rvolumes->at(0);
       vol1 = (Volume *)first->convertToColorVolume(rvolumes->at(0),
@@ -2275,6 +2282,7 @@ void MainWindow::LoadLabel() {
 
 void MainWindow::LoadLabelFromFile( QString fileName ) {
 
+  ui->statusbar->showMessage(QString("Loading ") + fileName + QString("..."), 3000);
   ReadMGZ *reader = new ReadMGZ(fileName);
   std::vector<ScalarVolume *> *rvolumes = reader->getVolume();
   if (!rvolumes || rvolumes->size() < 1) {
@@ -2481,6 +2489,30 @@ void MainWindow::createActions() {
   ui->actionSnapshots->setShortcut(tr("Ctrl+P"));
   connect(ui->actionSnapshots, SIGNAL(triggered()), this, SLOT(createSnapshots()));
 
+  ui->actionSet_Brightness_Contrast->setShortcut(tr("Ctrl+-"));
+  connect(ui->actionSet_Brightness_Contrast, SIGNAL(triggered()), this, SLOT(showBrightnessContrast()));
+}
+
+void MainWindow::setCurrentWindowLevel( float a, float b ) {
+  if (!vol1)
+    return;
+  vol1->currentWindowLevel[0] = a;
+  vol1->currentWindowLevel[1] = b;
+  windowLevel[0] = a;
+  windowLevel[1] = b;
+}
+
+
+// set brightness and contrast for the current window
+void MainWindow::showBrightnessContrast() {
+  if (!vol1) {
+    return; // do nothing
+  }
+  SetBrightnessContrast *w = new SetBrightnessContrast(this);
+  w->setRange(vol1->range[0], vol1->range[1]);
+  w->setLowIntensity(vol1->currentWindowLevel[0]);
+  w->setHighIntensity(vol1->currentWindowLevel[1]);
+  w->show();
 }
 
 void MainWindow::createSnapshots() {
@@ -2507,9 +2539,35 @@ void MainWindow::createSnapshots() {
 
 void MainWindow::about() {
   QMessageBox::about(this, tr("About Image Segmentation Editor"),
-                     tr("<p>The <b>Image Segmentation Editor v0.6</b> is an application that"
+                     tr("<p>The <b>Image Segmentation Editor v0.7</b> is an application that"
                         " supports image segmentation on multi-modal image data."
                         "</p><br/>Hauke Bartsch, Dr. rer. nat. 2013"));
+}
+
+// we don't need this for filling the contour, this is only required to compute the
+// line around a region of interest (like for displaying label borders instead of filled voxel)
+polygon_type *MainWindow::ConvertHighlightToPolygon( int which ) {
+
+  polygon_type *poly = new polygon_type();
+  //boost::geometry::read_wkt(
+  //     "POLYGON((2 1.3,2.4 1.7,2.8 1.8,3.4 1.2,3.7 1.6,3.4 2,4.1 3,5.3 2.6,5.4 1.2,4.9 0.8,2.9 0.7,2 1.3)"
+  //     "(4.0 2.0, 4.2 1.4, 4.8 1.9, 4.4 2.2, 4.0 2.0))", poly);
+
+  if (which == 0) {
+    // we should use smallest containing bounding box to search in only
+    // we should use thinning first, followed by scanline
+
+    point_type p(4, 1);
+
+    if (boost::geometry::within(p, *poly)) {
+      // do something
+    }
+  } else if (which == 1) {
+
+  } else if (which == 2) {
+
+  }
+  return poly;
 }
 
 void MainWindow::FillHighlight(int which) {
@@ -2523,7 +2581,19 @@ void MainWindow::FillHighlight(int which) {
 
   // use flood fill scanline method
   // start at the first voxel for the current slide
-  if (which == 0) {
+  if (which == 0) {    
+    // calculate the smallest bounding box of the current buffer highlight
+
+    // make a copy of that buffer region
+
+    // calculate topology preserving thinning
+    // https://github.com/bsdnoobz/zhang-suen-thinning/blob/master/thinning.cpp
+
+    // calculate scan-line filling of the thinned contour
+
+    // merge the resulting filled buffer with the original buffer
+
+
     size_t offset = slicePosition[2] * (lab1->size[0]*lab1->size[1]);
     for (int j = 0; j < lab1->size[1]; j++) {
       bool inside = false;
@@ -2635,11 +2705,11 @@ void MainWindow::update() {
     slicePosition[2] = vol1->size[2]-1;
 
   // draw first image
+  // ui->label->setText(QString("x: %1 y: %2 z: %3").arg(slicePosition[0]).arg(slicePosition[1]).arg(slicePosition[2]));
+
   updateImage1(slicePosition[2]);
   updateImage2(slicePosition[1]);
   updateImage3(slicePosition[0]);
-
-  ui->label->setText(QString("x: %1 y: %2 z: %3").arg(slicePosition[0]).arg(slicePosition[1]).arg(slicePosition[2]));
 }
 
 unsigned char * MainWindow::fillBuffer1(int pos, Volume *vol1, float alpha) {

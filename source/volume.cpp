@@ -1,3 +1,4 @@
+#include <QSettings>
 #include "volume.h"
 #include "readmgz.h"
 
@@ -154,6 +155,7 @@ void ScalarVolume::updateRange() {
 
 void ScalarVolume::computeHist() {
   hist.resize(512, 0);
+  std::fill(hist.begin(),hist.end(),0);
 
   // range needs to be known before
   if (range.size() != 2)
@@ -226,14 +228,19 @@ void ScalarVolume::computeHist() {
   }
   int step0 = 0; bool fs0 = false;
   int step1 = 0; bool fs1 = false;
+
+  QSettings settings;
+  float lowValue  = settings.value("Preferences/colorLowValue", 0.05).toDouble();
+  float highValue = settings.value("Preferences/colorHighValue", 0.99).toDouble();
+
   double val = 0.0;
   for (unsigned int i = 0; i < hist.size(); i++) {
     val += (double)hist[i]/(double)cumsum;
-    if (!fs0 && val > 0.02) {
+    if (!fs0 && val > lowValue) {
       fs0 = true;
       step0 = i;
     }
-    if (!fs1 && val > 0.999) {
+    if (!fs1 && val > highValue) {
       fs1 = true;
       step1 = i;
     }
@@ -752,13 +759,18 @@ void ColorVolume::computeHist() {
   int step0 = 0; bool fs0 = false;
   int step1 = 0; bool fs1 = false;
   double val = 0.0;
+
+  QSettings settings;
+  float lowValue = settings.value("Preferences/colorLowValue", 0.05).toDouble();
+  float highValue = settings.value("Preferences/colorHighValue", 0.9999).toDouble();
+
   for (unsigned int i = 0; i < hist.size()/elementLength; i++) {
     val += (double)hist[i]/(double)cumsum1;
-    if (!fs0 && val > 0.02) {
+    if (!fs0 && val > lowValue) {
       fs0 = true;
       step0 = i;
     }
-    if (!fs1 && val > 0.99) {
+    if (!fs1 && val > highValue) {
       fs1 = true;
       step1 = i;
     }

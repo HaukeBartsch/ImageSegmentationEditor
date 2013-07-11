@@ -15,8 +15,7 @@
 #include "preferences.h"
 #include <QtNetwork/QNetworkAccessManager>
 
-#include <boost/dynamic_bitset.hpp>
-
+#include "Types.h"
 #include "Volume.h"
 
 namespace Ui {
@@ -48,7 +47,9 @@ public:
     void updateImage3(int pos);
     void snapshot( QString filename );
     void setMainWindowPos( int pos );
+    void setCurrentWindowLevel( float a, float b );
 
+    polygon_type *ConvertHighlightToPolygon( int which );
 
 private slots:
     void on_pushButton_clicked();
@@ -102,6 +103,8 @@ private slots:
     void on_actionRedo_triggered();
 
     void on_actionPreferences_triggered();
+
+    void showBrightnessContrast();
 
 public slots:
     void loadRecentFile( QString fileName );

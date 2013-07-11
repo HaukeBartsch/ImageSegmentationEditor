@@ -81,7 +81,7 @@ void ExportSnapshots::on_buttonBox_accepted()
   QString format = "png";
   QString initialPath = QDir::currentPath() + tr("/snapshots.") + format;
 
-  QString fileName = QFileDialog::getSaveFileName(this, tr("Save As"),
+  QString fileName = QFileDialog::getSaveFileName(parent, tr("Save As"),
                               initialPath,
                               tr("%1 Files (*.%2);;All Files (*)")
                               .arg(format.toUpper())
@@ -104,4 +104,5 @@ void ExportSnapshots::on_buttonBox_accepted()
       ((MainWindow *)parent)->snapshot( fn );
     }
   }
+  this->hide();
 }

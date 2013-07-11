@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1281</width>
+    <width>1278</width>
     <height>747</height>
    </rect>
   </property>
@@ -412,7 +412,7 @@ border-right: 1px solid black;
             <property name="geometry">
              <rect>
               <x>0</x>
-              <y>0</y>
+              <y>-15</y>
               <width>794</width>
               <height>576</height>
              </rect>
@@ -482,7 +482,7 @@ border-right: 1px solid black;
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>1281</width>
+     <width>1278</width>
      <height>22</height>
     </rect>
    </property>
@@ -521,12 +521,26 @@ border-right: 1px solid black;
     <addaction name="actionUndo"/>
     <addaction name="actionRedo"/>
     <addaction name="actionSnapshots"/>
+    <addaction name="actionSet_Brightness_Contrast"/>
    </widget>
    <addaction name="menuLoad"/>
    <addaction name="menuEdit"/>
    <addaction name="menuAbout"/>
   </widget>
-  <widget class="QStatusBar" name="statusbar"/>
+  <widget class="QStatusBar" name="statusbar">
+   <property name="enabled">
+    <bool>true</bool>
+   </property>
+   <property name="sizePolicy">
+    <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+     <horstretch>0</horstretch>
+     <verstretch>0</verstretch>
+    </sizepolicy>
+   </property>
+   <property name="sizeGripEnabled">
+    <bool>true</bool>
+   </property>
+  </widget>
   <action name="actionLoad_Image">
    <property name="text">
     <string>Load Volume</string>
@@ -586,6 +600,11 @@ border-right: 1px solid black;
   <action name="actionSnapshots">
    <property name="text">
     <string>Snapshots</string>
+   </property>
+  </action>
+  <action name="actionSet_Brightness_Contrast">
+   <property name="text">
+    <string>Set Brightness/Contrast</string>
    </property>
   </action>
  </widget>

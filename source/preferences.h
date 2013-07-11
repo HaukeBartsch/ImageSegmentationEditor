@@ -25,6 +25,10 @@ public:
   QStringList getRecentLabels();
   void addToRecentLabels( QString str );
   int getMaxNumberRecentFiles();
+  float getGrayLowValue();
+  float getGrayHighValue();
+  float getColorLowValue();
+  float getColorHighValue();
 
 private slots:
   void on_preferences_undoSteps_valueChanged(int arg1);
@@ -36,6 +40,14 @@ private slots:
   void on_autoSaveLabels_toggled(bool checked);
 
   void on_preferences_NumberRecentFiles_valueChanged(int arg1);
+
+  void on_GrayLowValue_valueChanged(double arg1);
+
+  void on_GrayHighValue_valueChanged(double arg1);
+
+  void on_ColorLowValue_valueChanged(double arg1);
+
+  void on_ColorHighValue_valueChanged(double arg1);
 
 private:
   Ui::Preferences *ui;
