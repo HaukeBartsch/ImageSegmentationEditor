@@ -279,8 +279,11 @@ std::vector<ScalarVolume*> *ReadMGZ::getVolume() {
 
         QString name = QString("comp%1").arg(i);
         //data->composeLabel(McFilename(filename).basename(), name.getString() );
-        fread(data->dataPtr, (size_t)bytesPerComp, (ulong)dims[0]*dims[1]*dims[2], fp);
-
+        size_t readBytes = fread(data->dataPtr, 1, bytesPerComp*(ulong)dims[0]*dims[1]*dims[2], fp);
+        if (readBytes != bytesPerComp*(ulong)dims[0]*dims[1]*dims[2]) {
+          fprintf(stderr, "ERROR: could not read all bytes (%fMB) from the file (%fMB)", (bytesPerComp*(ulong)dims[0]*dims[1]*dims[2])/1024.0/1024.0, readBytes/1024.0/1024.0);
+          continue;
+        }
         switch (type) {
         case 0:
             break;

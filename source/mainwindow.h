@@ -48,6 +48,7 @@ public:
     void snapshot( QString filename );
     void setMainWindowPos( int pos );
     void setCurrentWindowLevel( float a, float b );
+    void disableAllButtonsBut( int t );
 
     polygon_type *ConvertHighlightToPolygon( int which );
 
@@ -106,12 +107,16 @@ private slots:
 
     void showBrightnessContrast();
 
+    void on_scrollToggle_toggled(bool checked);
+
 public slots:
     void loadRecentFile( QString fileName );
     void loadThisFile();
     void loadRecentLabel( QString fileName );
     void loadThisLabel();
+    void showThisVolume( int idx );
     void LoadImage();
+    void showThisVolumeAction();
     void LoadLabel();
     void closeEvent(QCloseEvent *event);
 
@@ -130,6 +135,7 @@ private:
     void createActions();
     void setupDefaultMaterials();
     void getMaterialsFromLabel();
+    void updateThumbnails();
 
     std::vector<Volume *> volumes;
     std::vector<Volume *> labels;
@@ -153,6 +159,7 @@ private:
     float windowLevelBefore[2];
     float scaleFactor1Before;
     float scaleFactor23Before;
+    int slicePositionBefore[3];
     bool toolWindowLevel;
     bool toolSegmentation;
 
@@ -178,7 +185,8 @@ private:
       ContrastBrightness,
       BrushTool,
       MagicWandTool,
-      ZoomTool
+      ZoomTool,
+      ScrollTool
     };
 
     Tools currentTool;

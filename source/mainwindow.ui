@@ -44,7 +44,7 @@ border-right: 1px solid black;
       <property name="minimumSize">
        <size>
         <width>0</width>
-        <height>60</height>
+        <height>64</height>
        </size>
       </property>
       <property name="maximumSize">
@@ -54,12 +54,21 @@ border-right: 1px solid black;
        </size>
       </property>
       <property name="frameShape">
-       <enum>QFrame::StyledPanel</enum>
+       <enum>QFrame::NoFrame</enum>
       </property>
       <property name="frameShadow">
-       <enum>QFrame::Raised</enum>
+       <enum>QFrame::Plain</enum>
+      </property>
+      <property name="lineWidth">
+       <number>0</number>
       </property>
       <layout class="QHBoxLayout" name="horizontalLayout">
+       <property name="topMargin">
+        <number>0</number>
+       </property>
+       <property name="bottomMargin">
+        <number>0</number>
+       </property>
        <item>
         <widget class="QPushButton" name="pushButton_3">
          <property name="text">
@@ -75,13 +84,61 @@ border-right: 1px solid black;
         </widget>
        </item>
        <item>
+        <widget class="QScrollArea" name="thumbnails">
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+           <horstretch>0</horstretch>
+           <verstretch>0</verstretch>
+          </sizepolicy>
+         </property>
+         <property name="minimumSize">
+          <size>
+           <width>0</width>
+           <height>0</height>
+          </size>
+         </property>
+         <property name="styleSheet">
+          <string notr="true">background-color: rgb(66, 66, 66);
+color: rgb(255, 255, 255);</string>
+         </property>
+         <property name="frameShape">
+          <enum>QFrame::NoFrame</enum>
+         </property>
+         <property name="frameShadow">
+          <enum>QFrame::Plain</enum>
+         </property>
+         <property name="lineWidth">
+          <number>0</number>
+         </property>
+         <property name="midLineWidth">
+          <number>0</number>
+         </property>
+         <property name="verticalScrollBarPolicy">
+          <enum>Qt::ScrollBarAlwaysOff</enum>
+         </property>
+         <property name="widgetResizable">
+          <bool>true</bool>
+         </property>
+         <widget class="QWidget" name="scrollAreaWidgetContents_5">
+          <property name="geometry">
+           <rect>
+            <x>0</x>
+            <y>0</y>
+            <width>353</width>
+            <height>52</height>
+           </rect>
+          </property>
+         </widget>
+        </widget>
+       </item>
+       <item>
         <spacer name="horizontalSpacer">
          <property name="orientation">
           <enum>Qt::Horizontal</enum>
          </property>
          <property name="sizeHint" stdset="0">
           <size>
-           <width>761</width>
+           <width>400</width>
            <height>20</height>
           </size>
          </property>
@@ -187,7 +244,7 @@ border-right: 1px solid black;
                <x>0</x>
                <y>0</y>
                <width>280</width>
-               <height>356</height>
+               <height>352</height>
               </rect>
              </property>
              <layout class="QGridLayout" name="gridLayout_2">
@@ -255,8 +312,8 @@ border-right: 1px solid black;
             <widget class="QToolButton" name="toolButton_2">
              <property name="geometry">
               <rect>
-               <x>140</x>
-               <y>10</y>
+               <x>20</x>
+               <y>40</y>
                <width>51</width>
                <height>23</height>
               </rect>
@@ -272,7 +329,7 @@ border-right: 1px solid black;
              <property name="geometry">
               <rect>
                <x>20</x>
-               <y>40</y>
+               <y>70</y>
                <width>51</width>
                <height>21</height>
               </rect>
@@ -285,7 +342,7 @@ border-right: 1px solid black;
              <property name="geometry">
               <rect>
                <x>80</x>
-               <y>40</y>
+               <y>70</y>
                <width>51</width>
                <height>21</height>
               </rect>
@@ -298,7 +355,7 @@ border-right: 1px solid black;
              <property name="geometry">
               <rect>
                <x>140</x>
-               <y>40</y>
+               <y>70</y>
                <width>51</width>
                <height>21</height>
               </rect>
@@ -310,8 +367,8 @@ border-right: 1px solid black;
             <widget class="QToolButton" name="toolButton_6">
              <property name="geometry">
               <rect>
-               <x>200</x>
-               <y>10</y>
+               <x>80</x>
+               <y>40</y>
                <width>51</width>
                <height>23</height>
               </rect>
@@ -334,6 +391,22 @@ border-right: 1px solid black;
              </property>
              <property name="text">
               <string>Zoom</string>
+             </property>
+             <property name="checkable">
+              <bool>true</bool>
+             </property>
+            </widget>
+            <widget class="QToolButton" name="scrollToggle">
+             <property name="geometry">
+              <rect>
+               <x>140</x>
+               <y>10</y>
+               <width>51</width>
+               <height>23</height>
+              </rect>
+             </property>
+             <property name="text">
+              <string>Scroll</string>
              </property>
              <property name="checkable">
               <bool>true</bool>
@@ -393,6 +466,15 @@ border-right: 1px solid black;
              <height>500</height>
             </size>
            </property>
+           <property name="frameShape">
+            <enum>QFrame::NoFrame</enum>
+           </property>
+           <property name="frameShadow">
+            <enum>QFrame::Plain</enum>
+           </property>
+           <property name="lineWidth">
+            <number>0</number>
+           </property>
            <property name="verticalScrollBarPolicy">
             <enum>Qt::ScrollBarAsNeeded</enum>
            </property>
@@ -412,7 +494,7 @@ border-right: 1px solid black;
             <property name="geometry">
              <rect>
               <x>0</x>
-              <y>-15</y>
+              <y>0</y>
               <width>794</width>
               <height>576</height>
              </rect>
