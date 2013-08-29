@@ -81,7 +81,7 @@ void ExportSnapshots::on_buttonBox_accepted()
   QString format = "png";
   QString initialPath = QDir::currentPath() + tr("/snapshots.") + format;
 
-  QString fileName = QFileDialog::getSaveFileName(parent, tr("Save As"),
+  QString fileName = QFileDialog::getSaveFileName(this, tr("Save As"),
                               initialPath,
                               tr("%1 Files (*.%2);;All Files (*)")
                               .arg(format.toUpper())
@@ -91,14 +91,16 @@ void ExportSnapshots::on_buttonBox_accepted()
     for (int i = getStart(); i < getStop(); i+=getStep()) {
       ((MainWindow *)parent)->setMainWindowPos(i);
       ((MainWindow *)parent)->update();
+      //sleep(100);
       QString fn = QFileInfo(fileName).absolutePath() + QDir::separator() + QFileInfo(fileName).baseName() +
           QString("%1").arg(i, 4, 10, QChar('0')) + QString(".png");
       ((MainWindow *)parent)->snapshot( fn );
     }
-  } else if (getStart() > getStop()) {
+  } else {
     for (int i = getStart(); i > getStop()-1; i-=getStep()) {
       ((MainWindow *)parent)->setMainWindowPos(i);
       ((MainWindow *)parent)->update();
+      //sleep(100);
       QString fn = QFileInfo(fileName).absolutePath() + QDir::separator() + QFileInfo(fileName).baseName() +
           QString("%1").arg(i, 4, 10, QChar('0')) + QString(".png");
       ((MainWindow *)parent)->snapshot( fn );
