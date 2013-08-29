@@ -250,6 +250,9 @@ color: rgb(255, 255, 255);</string>
              <layout class="QGridLayout" name="gridLayout_2">
               <item row="0" column="0">
                <widget class="QTreeWidget" name="treeWidget">
+                <property name="styleSheet">
+                 <string notr="true"/>
+                </property>
                 <property name="frameShape">
                  <enum>QFrame::NoFrame</enum>
                 </property>
@@ -312,7 +315,7 @@ color: rgb(255, 255, 255);</string>
             <widget class="QToolButton" name="toolButton_2">
              <property name="geometry">
               <rect>
-               <x>20</x>
+               <x>80</x>
                <y>40</y>
                <width>51</width>
                <height>23</height>
@@ -367,7 +370,7 @@ color: rgb(255, 255, 255);</string>
             <widget class="QToolButton" name="toolButton_6">
              <property name="geometry">
               <rect>
-               <x>80</x>
+               <x>140</x>
                <y>40</y>
                <width>51</width>
                <height>23</height>
@@ -407,6 +410,22 @@ color: rgb(255, 255, 255);</string>
              </property>
              <property name="text">
               <string>Scroll</string>
+             </property>
+             <property name="checkable">
+              <bool>true</bool>
+             </property>
+            </widget>
+            <widget class="QToolButton" name="pickTool">
+             <property name="geometry">
+              <rect>
+               <x>20</x>
+               <y>40</y>
+               <width>51</width>
+               <height>23</height>
+              </rect>
+             </property>
+             <property name="text">
+              <string>Pick</string>
              </property>
              <property name="checkable">
               <bool>true</bool>
