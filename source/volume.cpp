@@ -16,6 +16,8 @@ ScalarVolume::ScalarVolume(std::vector<int> dims, MyPrimType type)
     materialNames[0] = QString("Exterior");
     materialColors.resize(1);
     materialColors[0] = new QColor(0,0,0);
+    materialVisibility.resize(1);
+    materialVisibility[0] = true;
     filename = QString("empty");
 
     // create an empty volume
@@ -51,6 +53,7 @@ Volume *ScalarVolume::duplicate() {
   ret->loadCmd = this->loadCmd;
   ret->materialNames = this->materialNames;
   ret->materialColors = this->materialColors;
+  ret->materialVisibility = this->materialVisibility;
   ret->message = this->message;
   ret->range = this->range;
   ret->hist = this->hist;
@@ -475,6 +478,8 @@ ColorVolume::ColorVolume(std::vector<int> dims, MyPrimType type)
     materialNames[0] = QString("Exterior");
     materialColors.resize(1);
     materialColors[0] = new QColor(0,0,0);
+    materialVisibility.resize(1);
+    materialVisibility[0] = true;
 
     // create an empty volume
     this->size = dims;
@@ -509,6 +514,7 @@ Volume *ColorVolume::duplicate() {
   ret->loadCmd = this->loadCmd;
   ret->materialNames = this->materialNames;
   ret->materialColors = this->materialColors;
+  ret->materialVisibility = this->materialVisibility;
   ret->message = this->message;
   ret->range = this->range;
   ret->hist = this->hist;

@@ -15,6 +15,7 @@ public:
   // store material information
   std::vector<QString> materialNames;
   std::vector<QColor*> materialColors;
+  std::vector<bool> materialVisibility;
   QString loadCmd;
   QString filename;
   QString message;

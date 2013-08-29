@@ -323,6 +323,7 @@ std::vector<ScalarVolume*> *ReadMGZ::getVolume() {
           QColor color = QColor::fromHslF(hue, saturation, lightness);
 
           data->materialColors.push_back( new QColor(color) );
+          data->materialVisibility.push_back( true );
         }
 
         data->computeHist();

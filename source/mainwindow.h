@@ -109,6 +109,8 @@ private slots:
 
     void on_scrollToggle_toggled(bool checked);
 
+    void on_pickTool_toggled(bool checked);
+
 public slots:
     void loadRecentFile( QString fileName );
     void loadThisFile();
@@ -186,7 +188,8 @@ private:
       BrushTool,
       MagicWandTool,
       ZoomTool,
-      ScrollTool
+      ScrollTool,
+      PickTool
     };
 
     Tools currentTool;
@@ -195,6 +198,8 @@ private:
     void regionGrowing(int posx, int posy, int slice);
     void regionGrowing2(int posx, int posy, int slice);
     void regionGrowing3(int posx, int posy, int slice);
+
+    void regionGrowing3DLabel(int posx, int posy, int slice);
 
     bool showHighlights;
 
