@@ -2929,6 +2929,90 @@ void MainWindow::LoadLabelFromFile( QString fileName ) {
      getMaterialsFromLabel();
   }
 
+  // material ID's are encoded in the order of entries in the materialNames/materialColors/materialVisibility
+  // arrays, test if all materials are there is therefore easy
+  if (lab1->range[1] >= lab1->materialNames.size()) {
+    // add some more materials
+    for (int i = lab1->materialNames.size(); i <= lab1->range[1]; i++) {
+      lab1->materialNames.push_back(QString("material%1").arg(i));
+      lab1->materialColors.push_back(new QColor(128, 128, 128, 128 ));
+      lab1->materialVisibility.push_back( true );
+    }
+    getMaterialsFromLabel(); // re-create the labels in the user interface again
+  }
+
+/*
+  // check if we have a name for each material found in the image
+  // if we don't have a name invent one
+  {
+    std::set<int> labelsFound;
+    switch (lab1->dataType) {
+      case MyPrimType::CHAR: {
+          signed char *d = (signed char *)lab1->dataPtr;
+          for (size_t i = 0; i < (size_t)lab1->size[0]*lab1->size[1]*lab1->size[2]; i++) {
+            labelsFound.insert((int)d[0]);
+            d++;
+          }
+        }
+        break;
+      case MyPrimType::UCHAR: {
+          unsigned char *d = (unsigned char *)lab1->dataPtr;
+          for (size_t i = 0; i < (size_t)lab1->size[0]*lab1->size[1]*lab1->size[2]; i++) {
+            labelsFound.insert((int)d[0]);
+            d++;
+          }
+        }
+        break;
+      case MyPrimType::SHORT: {
+          short *d = (short *)lab1->dataPtr;
+          for (size_t i = 0; i < (size_t)lab1->size[0]*lab1->size[1]*lab1->size[2]; i++) {
+            labelsFound.insert((int)d[0]);
+            d++;
+          }
+        }
+        break;
+      case MyPrimType::USHORT: {
+          unsigned short *d = (unsigned short *)lab1->dataPtr;
+          for (size_t i = 0; i < (size_t)lab1->size[0]*lab1->size[1]*lab1->size[2]; i++) {
+            labelsFound.insert((int)d[0]);
+            d++;
+          }
+        }
+        break;
+      case MyPrimType::UINT: {
+          unsigned int *d = (unsigned int *)lab1->dataPtr;
+          for (size_t i = 0; i < (size_t)lab1->size[0]*lab1->size[1]*lab1->size[2]; i++) {
+            labelsFound.insert((int)d[0]);
+            d++;
+          }
+        }
+        break;
+      case MyPrimType::INT: {
+          int *d = (int *)lab1->dataPtr;
+          for (size_t i = 0; i < (size_t)lab1->size[0]*lab1->size[1]*lab1->size[2]; i++) {
+            labelsFound.insert((int)d[0]);
+            d++;
+          }
+        }
+        break;
+      default:
+        fprintf(stderr, "Error: this data type is not allowed as a label");
+        return;
+    }
+    // Compare the found label with the materials defined
+    std::set<int>::iterator it;
+    for (it = labelsFound.begin(); it != labelsFound.end(); it++) {
+      int label = *it;
+      for (int i = 0; i < lab1->materialNames.size(); i++) {
+
+      }
+
+    }
+
+
+  } */
+
+
   // add to undo
   UndoRedo::getInstance().add(&hbuffer, lab1);
   firstUndoStepDone = false;
@@ -3451,11 +3535,17 @@ unsigned char * MainWindow::fillBuffer1(int pos, Volume *vol1, float alpha) {
 unsigned char * MainWindow::fillBuffer1AsColor(int pos, ScalarVolume *vol1, float alpha) {
 
   int numBytes = MyPrimType::getTypeSize(vol1->dataType);
-  size_t offset = pos*(vol1->size[0]*vol1->size[1])*numBytes;
+  if (pos >= vol1->size[2])
+    fprintf(stderr, "Error: try to fill buffer at non-existing location in vol1");
+  size_t offset = pos*((size_t)(vol1->size[0])*vol1->size[1])*numBytes;
 
   // create a correct buffer for the image (ARGB32)
   unsigned char *d = vol1->dataPtr + offset;
   unsigned char *buffer = (unsigned char*)malloc(4 * (size_t)vol1->size[0] * vol1->size[1]);
+  if (!buffer) {
+    fprintf(stderr, "Error: Could not allocate enough memory (%d)", (int)(4 * (size_t)vol1->size[0] * vol1->size[1] / 1024.0 / 1024.0));
+    return NULL;
+  }
   switch(vol1->dataType) {
     case MyPrimType::UCHAR :
     case MyPrimType::CHAR : {
