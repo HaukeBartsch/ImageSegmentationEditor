@@ -790,7 +790,7 @@ void ColorVolume::computeHist() {
 
 // flip a dimension
 void ColorVolume::flip(int which) {
-  // to be implememted
+  // to be implemented
   which++;
 }
 

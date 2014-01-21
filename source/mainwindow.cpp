@@ -19,6 +19,8 @@
 #include "readmgz.h"
 #include "readdicom.h"
 #include "setbrightnesscontrast.h"
+#include "helpdialog.h"
+#include "statistics.h"
 
 MainWindow::MainWindow(QWidget *parent) :
   QMainWindow(parent),
@@ -236,6 +238,7 @@ bool MainWindow::myKeyPressEvent(QObject *object, QKeyEvent *keyEvent) {
 
   bool isShift = QApplication::keyboardModifiers() & Qt::ShiftModifier;
   bool isCtrl  = QApplication::keyboardModifiers() & Qt::ControlModifier;
+  bool isAlt  = QApplication::keyboardModifiers() & Qt::AltModifier;
   if (keyEvent->key() == Qt::Key_Z && isCtrl) {
     if (isShift)
       redo();
@@ -530,7 +533,7 @@ void MainWindow::myMousePressEvent ( QObject *object, QMouseEvent * e ) {
   } else if (currentTool == MainWindow::MagicWandTool && object == Image2) {
     posx = floor( e->pos().x() / scaleFactor23);
     posy = floor( e->pos().y() / scaleFactor23);
-    regionGrowing2(posx, posy, slicePosition[1]);
+    regionGrowing2(posy, posx, slicePosition[1]);
     update();
   } else if (currentTool == MainWindow::MagicWandTool && object == Image3) {
     posx = floor( e->pos().x() / scaleFactor23);
@@ -544,12 +547,12 @@ void MainWindow::myMousePressEvent ( QObject *object, QMouseEvent * e ) {
   } else if (currentTool == MainWindow::PickTool && object == Image2) {
     posx = floor( e->pos().x() / scaleFactor23);
     posy = floor( e->pos().y() / scaleFactor23);
-    regionGrowing3DLabel(posx, posy, slicePosition[1]);
+    regionGrowing3DLabel(posy, slicePosition[1], posx);
     update();
   } else if (currentTool == MainWindow::PickTool && object == Image3) {
     posx = floor( e->pos().x() / scaleFactor23);
     posy = floor( e->pos().y() / scaleFactor23);
-    regionGrowing3DLabel(posx, posy, slicePosition[0]);
+    regionGrowing3DLabel(slicePosition[0], posy, posx);
     update();
   }
   // add to undo
@@ -571,22 +574,30 @@ void MainWindow::setHighlightBuffer(QObject *object, QMouseEvent *e) {
     switch(BrushToolWidth) {
       case 1:
         for (int i = 0; i < brushShapePixel[BrushToolWidth-1]*2; i+=2) {
-          hbuffer[slicePosition[2]*(lab1->size[0]*lab1->size[1]) + (posy+brushShape1[i])*lab1->size[0] + posx+brushShape1[i+1]] = !isCtrl;
+          size_t p = slicePosition[2]*((size_t)lab1->size[0]*lab1->size[1]) + (posy+brushShape1[i])*lab1->size[0] + posx+brushShape1[i+1];
+          if (p < hbuffer.size())
+            hbuffer[p] = !isCtrl;
         }
         break;
       case 2:
         for (int i = 0; i < brushShapePixel[BrushToolWidth-1]*2; i+=2) {
-          hbuffer[slicePosition[2]*(lab1->size[0]*lab1->size[1]) + (posy+brushShape2[i])*lab1->size[0] + posx+brushShape2[i+1]] = !isCtrl;
+          size_t p = slicePosition[2]*((size_t)lab1->size[0]*lab1->size[1]) + (posy+brushShape2[i])*lab1->size[0] + posx+brushShape2[i+1];
+          if (p < hbuffer.size())
+            hbuffer[p] = !isCtrl;
         }
         break;
       case 3:
         for (int i = 0; i < brushShapePixel[BrushToolWidth-1]*2; i+=2) {
-          hbuffer[slicePosition[2]*(lab1->size[0]*lab1->size[1]) + (posy+brushShape3[i])*lab1->size[0] + posx+brushShape3[i+1]] = !isCtrl;
+          size_t p = slicePosition[2]*((size_t)lab1->size[0]*lab1->size[1]) + (posy+brushShape3[i])*lab1->size[0] + posx+brushShape3[i+1];
+          if (p < hbuffer.size())
+            hbuffer[p] = !isCtrl;
         }
         break;
       case 4:
         for (int i = 0; i < brushShapePixel[BrushToolWidth-1]*2; i+=2) {
-          hbuffer[slicePosition[2]*(lab1->size[0]*lab1->size[1]) + (posy+brushShape4[i])*lab1->size[0] + posx+brushShape4[i+1]] = !isCtrl;
+          size_t p = slicePosition[2]*((size_t)lab1->size[0]*lab1->size[1]) + (posy+brushShape4[i])*lab1->size[0] + posx+brushShape4[i+1];
+          if (p < hbuffer.size())
+            hbuffer[p] = !isCtrl;
         }
         break;
       default:
@@ -610,22 +621,30 @@ void MainWindow::setHighlightBuffer(QObject *object, QMouseEvent *e) {
     switch(BrushToolWidth) {
       case 1:
         for (int i = 0; i < brushShapePixel[BrushToolWidth-1]*2; i+=2) {
-          hbuffer[(posy+brushShape1[i])*(lab1->size[0]*lab1->size[1]) + slicePosition[1]*lab1->size[0] + posx+brushShape1[i+1]] = !isCtrl;
+          size_t p = (posx+brushShape1[i])*((size_t)lab1->size[0]*lab1->size[1]) + slicePosition[1]*lab1->size[0] + posy+brushShape1[i+1];
+          if (p < hbuffer.size())
+            hbuffer[p] = !isCtrl;
         }
         break;
       case 2:
         for (int i = 0; i < brushShapePixel[BrushToolWidth-1]*2; i+=2) {
-          hbuffer[(posy+brushShape2[i])*(lab1->size[0]*lab1->size[1]) + slicePosition[1]*lab1->size[0] + posx+brushShape2[i+1]] = !isCtrl;
+          size_t p = (posx+brushShape2[i])*((size_t)lab1->size[0]*lab1->size[1]) + slicePosition[1]*lab1->size[0] + posy+brushShape2[i+1];
+          if (p < hbuffer.size())
+            hbuffer[p] = !isCtrl;
         }
         break;
       case 3:
         for (int i = 0; i < brushShapePixel[BrushToolWidth-1]*2; i+=2) {
-          hbuffer[(posy+brushShape3[i])*(lab1->size[0]*lab1->size[1]) + slicePosition[1]*lab1->size[0] + posx+brushShape3[i+1]] = !isCtrl;
+          size_t p = (posx+brushShape3[i])*((size_t)lab1->size[0]*lab1->size[1]) + slicePosition[1]*lab1->size[0] + posy+brushShape3[i+1];
+          if (p < hbuffer.size())
+            hbuffer[p] = !isCtrl;
         }
         break;
       case 4:
         for (int i = 0; i < brushShapePixel[BrushToolWidth-1]*2; i+=2) {
-          hbuffer[(posy+brushShape4[i])*(lab1->size[0]*lab1->size[1]) + slicePosition[1]*lab1->size[0] + posx+brushShape4[i+1]] = !isCtrl;
+          size_t p = (posx+brushShape4[i])*((size_t)lab1->size[0]*lab1->size[1]) + slicePosition[1]*lab1->size[0] + posy+brushShape4[i+1];
+          if (p < hbuffer.size())
+            hbuffer[p] = !isCtrl;
         }
         break;
       default:
@@ -650,22 +669,30 @@ void MainWindow::setHighlightBuffer(QObject *object, QMouseEvent *e) {
     switch(BrushToolWidth) {
       case 1:
         for (int i = 0; i < brushShapePixel[BrushToolWidth-1]*2; i+=2) {
-          hbuffer[(posy+brushShape1[i])*(lab1->size[0]*lab1->size[1]) + (posx+brushShape1[i+1])*lab1->size[0] + slicePosition[0]] = !isCtrl;
+          size_t p = (posx+brushShape1[i])*((size_t)lab1->size[0]*lab1->size[1]) + (posy+brushShape1[i+1])*lab1->size[0] + slicePosition[0];
+          if (p < hbuffer.size())
+            hbuffer[p] = !isCtrl;
         }
         break;
       case 2:
         for (int i = 0; i < brushShapePixel[BrushToolWidth-1]*2; i+=2) {
-          hbuffer[(posy+brushShape2[i])*(lab1->size[0]*lab1->size[1]) + (posx+brushShape2[i+1])*lab1->size[0] + slicePosition[0]] = !isCtrl;
+          size_t p = (posx+brushShape2[i])*((size_t)lab1->size[0]*lab1->size[1]) + (posy+brushShape2[i+1])*lab1->size[0] + slicePosition[0];
+          if (p < hbuffer.size())
+            hbuffer[p] = !isCtrl;
         }
         break;
       case 3:
         for (int i = 0; i < brushShapePixel[BrushToolWidth-1]*2; i+=2) {
-          hbuffer[(posy+brushShape3[i])*(lab1->size[0]*lab1->size[1]) + (posx+brushShape3[i+1])*lab1->size[0] + slicePosition[0]] = !isCtrl;
+          size_t p = (posx+brushShape3[i])*((size_t)lab1->size[0]*lab1->size[1]) + (posy+brushShape3[i+1])*lab1->size[0] + slicePosition[0];
+          if ( p < hbuffer.size() )
+            hbuffer[p] = !isCtrl;
         }
         break;
       case 4:
         for (int i = 0; i < brushShapePixel[BrushToolWidth-1]*2; i+=2) {
-          hbuffer[(posy+brushShape4[i])*(lab1->size[0]*lab1->size[1]) + (posx+brushShape4[i+1])*lab1->size[0] + slicePosition[0]] = !isCtrl;
+          size_t p = (posx+brushShape4[i])*((size_t)lab1->size[0]*lab1->size[1]) + (posy+brushShape4[i+1])*lab1->size[0] + slicePosition[0];
+          if (p < hbuffer.size())
+            hbuffer[p] = !isCtrl;
         }
         break;
       default:
@@ -700,15 +727,168 @@ bool MainWindow::mouseEvent(QObject *object, QMouseEvent *e) {
       y = floor(e->pos().y() / scaleFactor23);
     }
 
-    ui->label->setText(QString("x: %1 y: %2 z: %3 (%4,%5)")
+    // what is the label at this location?
+    int label = 0;
+    if (lab1) {
+      size_t maxidx = (size_t)lab1->size[0]*lab1->size[1]*lab1->size[2];
+      if (object == Image1) {
+        int posx = floor( e->pos().x() / scaleFactor1);
+        int posy = floor( e->pos().y() / scaleFactor1);
+
+        switch(lab1->dataType) {
+          case MyPrimType::UCHAR : {
+              unsigned char *d = (unsigned char *)lab1->dataPtr;
+              size_t p = slicePosition[2]*((size_t)lab1->size[0]*lab1->size[1]) + posy*lab1->size[0] + posx;
+              if (p < maxidx)
+                label = (int)d[p];
+            }
+            break;
+          case MyPrimType::CHAR : {
+              signed char *d = (signed char *)lab1->dataPtr;
+              size_t p = slicePosition[2]*((size_t)lab1->size[0]*lab1->size[1]) + posy*lab1->size[0] + posx;
+              if (p < maxidx)
+                label = (int)d[p];
+            }
+            break;
+          case MyPrimType::SHORT : {
+              signed short *d = (signed short *)lab1->dataPtr;
+              size_t p = slicePosition[2]*((size_t)lab1->size[0]*lab1->size[1]) + posy*lab1->size[0] + posx;
+              if (p < maxidx)
+                label = (int)d[p];
+            }
+            break;
+          case MyPrimType::USHORT : {
+              unsigned short *d = (unsigned short *)lab1->dataPtr;
+              size_t p = slicePosition[2]*((size_t)lab1->size[0]*lab1->size[1]) + posy*lab1->size[0] + posx;
+              if (p < maxidx)
+                label = (int)d[p];
+            }
+            break;
+          case MyPrimType::INT : {
+              signed int *d = (signed int *)lab1->dataPtr;
+              size_t p = slicePosition[2]*((size_t)lab1->size[0]*lab1->size[1]) + posy*lab1->size[0] + posx;
+              if (p < maxidx)
+                label = (int)d[p];
+            }
+            break;
+          case MyPrimType::UINT : {
+              unsigned int *d = (unsigned int *)lab1->dataPtr;
+              size_t p = slicePosition[2]*((size_t)lab1->size[0]*lab1->size[1]) + posy*lab1->size[0] + posx;
+              if (p < maxidx)
+                label = (int)d[p];
+            }
+            break;
+        }
+      } else  if (object == Image2) {
+        int posx = floor( e->pos().x() / scaleFactor23);
+        int posy = floor( e->pos().y() / scaleFactor23);
+
+        switch(lab1->dataType) {
+          case MyPrimType::UCHAR : {
+              unsigned char *d = (unsigned char *)lab1->dataPtr;
+              size_t p = posx*((size_t)lab1->size[0]*lab1->size[1]) + slicePosition[1]*lab1->size[0] + posy;
+              if (p < maxidx)
+                label = (int)d[p];
+            }
+            break;
+          case MyPrimType::CHAR : {
+              signed char *d = (signed char *)lab1->dataPtr;
+              size_t p = posx*((size_t)lab1->size[0]*lab1->size[1]) + slicePosition[1]*lab1->size[0] + posy;
+              if (p < maxidx)
+                label = (int)d[p];
+            }
+            break;
+          case MyPrimType::SHORT : {
+              signed short *d = (signed short *)lab1->dataPtr;
+              size_t p = posx*((size_t)lab1->size[0]*lab1->size[1]) + slicePosition[1]*lab1->size[0] + posy;
+              if (p < maxidx)
+                label = (int)d[p];
+            }
+            break;
+          case MyPrimType::USHORT : {
+              unsigned short *d = (unsigned short *)lab1->dataPtr;
+              size_t p = posx*((size_t)lab1->size[0]*lab1->size[1]) + slicePosition[1]*lab1->size[0] + posy;
+              if (p < maxidx)
+                label = (int)d[p];
+            }
+            break;
+          case MyPrimType::INT : {
+              signed int *d = (signed int *)lab1->dataPtr;
+              size_t p = posx*((size_t)lab1->size[0]*lab1->size[1]) + slicePosition[1]*lab1->size[0] + posy;
+              if (p < maxidx)
+                label = (int)d[p];
+            }
+            break;
+          case MyPrimType::UINT : {
+              unsigned int *d = (unsigned int *)lab1->dataPtr;
+              size_t p = posx*((size_t)lab1->size[0]*lab1->size[1]) + slicePosition[1]*lab1->size[0] + posy;
+              if (p < maxidx)
+                label = (int)d[p];
+            }
+            break;
+        }
+      } else if (object == Image3) {
+        int posx = floor( e->pos().x() / scaleFactor23);
+        int posy = floor( e->pos().y() / scaleFactor23);
+
+        switch(lab1->dataType) {
+          case MyPrimType::UCHAR : {
+              unsigned char *d = (unsigned char *)lab1->dataPtr;
+              size_t p = posx*((size_t)lab1->size[0]*lab1->size[1]) + posy*lab1->size[0] + slicePosition[0];
+              if (p < maxidx)
+                label = (int)d[p];
+            }
+            break;
+          case MyPrimType::CHAR : {
+              signed char *d = (signed char *)lab1->dataPtr;
+              size_t p = posx*((size_t)lab1->size[0]*lab1->size[1]) + posy*lab1->size[0] + slicePosition[0];
+              if (p < maxidx)
+                label = (int)d[p];
+            }
+            break;
+          case MyPrimType::SHORT : {
+              signed short *d = (signed short *)lab1->dataPtr;
+              size_t p = posx*((size_t)lab1->size[0]*lab1->size[1]) + posy*lab1->size[0] + slicePosition[0];
+              if (p < maxidx)
+                label = (int)d[p];
+            }
+            break;
+          case MyPrimType::USHORT : {
+              unsigned short *d = (unsigned short *)lab1->dataPtr;
+              size_t p = posx*((size_t)lab1->size[0]*lab1->size[1]) + posy*lab1->size[0] + slicePosition[0];
+              if (p < maxidx)
+                label = (int)d[p];
+            }
+            break;
+          case MyPrimType::INT : {
+              signed int *d = (signed int *)lab1->dataPtr;
+              size_t p = posx*((size_t)lab1->size[0]*lab1->size[1]) + posy*lab1->size[0] + slicePosition[0];
+              if (p < maxidx)
+                label = (int)d[p];
+            }
+            break;
+          case MyPrimType::UINT : {
+              unsigned int *d = (unsigned int *)lab1->dataPtr;
+              size_t p = posx*((size_t)lab1->size[0]*lab1->size[1]) + posy*lab1->size[0] + slicePosition[0];
+              if (p < maxidx)
+                label = (int)d[p];
+            }
+            break;
+        }
+      }
+    }
+    ui->label->setText(QString("x: %1 y: %2 z: %3 (%4,%5,%6)")
                        .arg(slicePosition[0])
         .arg(slicePosition[1])
         .arg(slicePosition[2])
         .arg( x )
-        .arg( y ));
+        .arg( y )
+        .arg( label ));
   }
 
   bool isShift = QApplication::keyboardModifiers() & Qt::ShiftModifier;
+  bool isCtrl  = QApplication::keyboardModifiers() & Qt::ControlModifier;
+  bool isAlt   = QApplication::keyboardModifiers() & Qt::AltModifier;
   // extract the intensity at the mouse location and show as text
   if (mouseIsDown && (currentTool == MainWindow::ContrastBrightness ||
                       isShift)) {
@@ -738,7 +918,7 @@ bool MainWindow::mouseEvent(QObject *object, QMouseEvent *e) {
         .arg( vol1->currentWindowLevel[1] ));
 
     update();
-  } else if (mouseIsDown && currentTool == MainWindow::ZoomTool) {
+  } else if (mouseIsDown && (currentTool == MainWindow::ZoomTool || isCtrl)) {
     float disty = (mousePressLocation[1] - e->pos().y())/200.0;
     fprintf(stderr, "zoom changed: %f %f", scaleFactor1, disty);
 
@@ -778,7 +958,7 @@ bool MainWindow::mouseEvent(QObject *object, QMouseEvent *e) {
     }
     // add to undo
     //UndoRedo::getInstance().add(&hbuffer);
-  } else if (mouseIsDown && currentTool == MainWindow::ScrollTool) {
+  } else if (mouseIsDown && (currentTool == MainWindow::ScrollTool || isAlt)) {
     float disty = (mousePressLocation[1] - e->pos().y())/2.0;
 
     if (object == Image1) {
@@ -2458,14 +2638,14 @@ void MainWindow::myMouseButtonDblClick(QObject *object, QMouseEvent *mouseEvent)
     // slicePosition[2] = (int)floor( mouseEvent->pos().x() / scaleFactor1 + 0.5);
     update();
   } else if (object == Image2) {
-    slicePosition[0] = (int)floor( mouseEvent->pos().x() / scaleFactor23);
+    slicePosition[2] = (int)floor( mouseEvent->pos().x() / scaleFactor23);
     //slicePosition[1] = (int)floor( mouseEvent->pos().y() / scaleFactor23);
-    slicePosition[2] = (int)floor( mouseEvent->pos().y() / scaleFactor23);
+    slicePosition[0] = (int)floor( mouseEvent->pos().y() / scaleFactor23);
     update();
   } else if (object == Image3) {
     // slicePosition[0] = (int)floor( mouseEvent->pos().x() / scaleFactor23);
-    slicePosition[1] = (int)floor( mouseEvent->pos().x() / scaleFactor23);
-    slicePosition[2] = (int)floor( mouseEvent->pos().y() / scaleFactor23);
+    slicePosition[2] = (int)floor( mouseEvent->pos().x() / scaleFactor23);
+    slicePosition[1] = (int)floor( mouseEvent->pos().y() / scaleFactor23);
     update();
   }
 }
@@ -2502,18 +2682,21 @@ bool MainWindow::myMouseWheelEvent (QObject *object, QWheelEvent * e) {
 void MainWindow::setupDefaultMaterials() {
 
   QTreeWidgetItem *newItem = new QTreeWidgetItem(ui->treeWidget, QStringList(QString("Exterior")));
+  if (!newItem) return;
   newItem->setText(1, QString("%1").arg(0));
   QColor color = QColor::fromRgb(0,0,0);
   newItem->setBackground(2, QBrush(color));
 
   int newMaterialIdx = 1;
   newItem = new QTreeWidgetItem(ui->treeWidget, QStringList(QString("material%1").arg(newMaterialIdx)));
+  if (!newItem) return;
   newItem->setText(1, QString("%1").arg(newMaterialIdx));
   color = QColor::fromRgb(255,127,0);
   newItem->setBackground(2, QBrush(color));
 
   newMaterialIdx++;
   newItem = new QTreeWidgetItem(ui->treeWidget, QStringList(QString("material%1").arg(newMaterialIdx)));
+  if (!newItem) return;
   newItem->setText(1, QString("%1").arg(newMaterialIdx));
   color = QColor::fromRgb(255,250,20);
   newItem->setBackground(2, QBrush(color));
@@ -2553,7 +2736,10 @@ void MainWindow::on_pushButton_clicked()
   if (!lab1)
     return;
 
-  int newMaterialIdx = ui->treeWidget->topLevelItemCount();
+  // label of the new material is
+  int newMaterialIdx = lab1->materialNames.size();
+
+  // int newMaterialIdx = ui->treeWidget->topLevelItemCount();
   QString name = QString("material%1").arg(newMaterialIdx);
   QTreeWidgetItem *newItem = new QTreeWidgetItem(ui->treeWidget, QStringList(name));
   newItem->setText(1, QString("%1").arg(newMaterialIdx));
@@ -2578,16 +2764,36 @@ void MainWindow::on_pushButton_2_clicked()
   if (!item)
     return;
   int idx = item->text(1).toInt();
-  // remove material from label field as well
+  if (idx == 0) {
+    return; // exterior cannot be deleted
+  }
   if (idx < (int)lab1->materialNames.size()) {
     lab1->materialColors.erase(lab1->materialColors.begin()+idx);
     lab1->materialNames.erase(lab1->materialNames.begin()+idx);
     lab1->materialVisibility.erase(lab1->materialVisibility.begin()+idx);
-  }
 
-  int index = ui->treeWidget->indexOfTopLevelItem(item);
-  delete ui->treeWidget->takeTopLevelItem(index);
-  update();
+    // remove material from label field as well
+    for (size_t i = 0; i < (size_t)lab1->size[0]*lab1->size[1]*lab1->size[2]; i++) {
+      if (lab1->dataPtr[i] == idx)
+        lab1->dataPtr[i] = 0; // remove that label
+      if (lab1->dataPtr[i] > idx) // all other label have to move down once
+        lab1->dataPtr[i]--;
+    }
+    int index = ui->treeWidget->indexOfTopLevelItem(item);
+    QTreeWidgetItem *del = ui->treeWidget->takeTopLevelItem(index);
+
+    QTreeWidgetItemIterator it(ui->treeWidget);
+    while (*it) {
+      int t = (*it)->text(1).toInt();
+      if (t > idx)
+        (*it)->setText(1, QString("%1").arg(--t));
+      ++it;
+    }
+
+    //if (del)
+    //   delete del;
+    update();
+  }
 }
 
 
@@ -2770,6 +2976,7 @@ void MainWindow::updateThumbnails() {
        newbutton->setMinimumHeight(32);
        newbutton->setProperty("filename", QVariant(volumes[i]->filename));
        newbutton->setProperty("volumeid", QVariant(i));
+       newbutton->setToolTip(QString("%1").arg(volumes[i]->filename));
        layout->addWidget(newbutton);
        connect(newbutton, SIGNAL(clicked()), this, SLOT(showThisVolumeAction()));
      }
@@ -3037,6 +3244,31 @@ void MainWindow::SaveLabelAskForName() {
   SaveLabel(fileName);
 }
 
+void MainWindow::SaveExistingLabel() {
+  if (!lab1)
+    return;
+
+  if (lab1->filename.length() == 0) {
+    SaveLabelAskForName();
+    return;
+  }
+
+  QFileInfo fi(lab1->filename);
+  if (!fi.exists()) {
+    SaveLabelAskForName();
+    return;
+  }
+
+  if (!fi.isWritable()) {
+    QMessageBox msg;
+    msg.setText( "Could not save this file. File is not writable for the current user.");
+    msg.exec();
+    return;
+  }
+
+  SaveLabel(lab1->filename);
+}
+
 void MainWindow::SaveLabel(QString fileName) {
   if (!lab1)
     return; // do nothing
@@ -3087,6 +3319,7 @@ void MainWindow::SaveLabel(QString fileName) {
     streamFileOut.flush();
     file.close();
   }
+  ui->label->setText("Saved label...");
 }
 
 void MainWindow::snapshot( QString filename ) {
@@ -3144,8 +3377,11 @@ void MainWindow::createActions() {
   ui->actionLoad_Image->setShortcut(tr("Ctrl+I"));
   connect(ui->actionLoad_Image, SIGNAL(triggered()), this, SLOT(LoadImage()));
 
-  ui->actionSave_Label->setShortcut(tr("Ctrl+S"));
+  //ui->actionSave_Label->setShortcut(tr("Ctrl+S"));
   connect(ui->actionSave_Label, SIGNAL(triggered()), this, SLOT(SaveLabelAskForName()));
+
+  ui->actionSave_Label_2->setShortcut(tr("Ctrl+S"));
+  connect(ui->actionSave_Label_2, SIGNAL(triggered()), this, SLOT(SaveExistingLabel()));
 
   ui->actionLoad_Label->setShortcut(tr("Ctrl+L"));
   connect(ui->actionLoad_Label, SIGNAL(triggered()), this, SLOT(LoadLabel()));
@@ -3161,6 +3397,17 @@ void MainWindow::createActions() {
 
   ui->actionSet_Brightness_Contrast->setShortcut(tr("Ctrl+-"));
   connect(ui->actionSet_Brightness_Contrast, SIGNAL(triggered()), this, SLOT(showBrightnessContrast()));
+
+
+  ui->actionStatisticsDialog->setShortcut(tr("Ctrl+;"));
+  connect(ui->actionStatisticsDialog, SIGNAL(triggered()), this, SLOT(showStatisticsDialog()));
+
+  connect(ui->actionHow_it_works, SIGNAL(triggered()), this, SLOT(showHelp()));
+}
+
+void MainWindow::showHelp() {
+  HelpDialog *h = new HelpDialog();
+  h->show();
 }
 
 void MainWindow::setCurrentWindowLevel( float a, float b ) {
@@ -3172,6 +3419,14 @@ void MainWindow::setCurrentWindowLevel( float a, float b ) {
   windowLevel[1] = b;
 }
 
+void MainWindow::showStatisticsDialog() {
+  if (!lab1)
+    return;
+  Statistics *s = new Statistics(this);
+  s->setLabel( (ScalarVolume *)lab1 );
+  s->compute();
+  s->show();
+}
 
 // set brightness and contrast for the current window
 void MainWindow::showBrightnessContrast() {
@@ -3209,7 +3464,7 @@ void MainWindow::createSnapshots() {
 
 void MainWindow::about() {
   QMessageBox::about(this, tr("About Image Segmentation Editor"),
-                     tr("<p>The <b>Image Segmentation Editor v0.8.4</b> is an application that"
+                     tr("<p>The <b>Image Segmentation Editor v0.8.7</b> is an application that"
                         " supports image segmentation on multi-modal image data."
                         "</p><br/>Hauke Bartsch, Dr. rer. nat. 2013"));
 }
@@ -3641,10 +3896,10 @@ unsigned char *MainWindow::fillBuffer2(int pos, Volume *vol1, float alpha) {
         unsigned char *data = (unsigned char *)d;
         size_t count = 0;
         if (vol1->elementLength == 1) {
-          for (size_t j = 0; j < (size_t)vol1->size[2]; j++) {
-            for (size_t i = 0; i < (size_t)vol1->size[0]; i++) {
+          for (size_t j = 0; j < (size_t)vol1->size[0]; j++) {
+            for (size_t i = 0; i < (size_t)vol1->size[2]; i++) {
               data = (unsigned char *)d;
-              data += j*(vol1->size[0]*vol1->size[1])+pos*vol1->size[0]+i;
+              data += i*(vol1->size[0]*vol1->size[1])+pos*vol1->size[0]+j;
               double val = CLAMP((data[0] - windowLevel[0])/(windowLevel[1]-windowLevel[0])*255, 0, 255);
               buffer[count*4+0] = val;
               buffer[count*4+1] = val;
@@ -3654,10 +3909,10 @@ unsigned char *MainWindow::fillBuffer2(int pos, Volume *vol1, float alpha) {
             }
           }
         } else if (vol1->elementLength == 4) {
-          for (size_t j = 0; j < (size_t)vol1->size[2]; j++) {
-            for (size_t i = 0; i < (size_t)vol1->size[0]; i++) {
+          for (size_t j = 0; j < (size_t)vol1->size[0]; j++) {
+            for (size_t i = 0; i < (size_t)vol1->size[2]; i++) {
               data = (unsigned char *)d;
-              data += 4*(j*(vol1->size[0]*vol1->size[1])+pos*vol1->size[0]+i);
+              data += 4*(i*(vol1->size[0]*vol1->size[1])+pos*vol1->size[0]+j);
               buffer[count*4+0] = CLAMP((data[2] - windowLevel[0])/(windowLevel[1]-windowLevel[0])*255, 0, 255);
               buffer[count*4+1] = CLAMP((data[1] - windowLevel[0])/(windowLevel[1]-windowLevel[0])*255, 0, 255);
               buffer[count*4+2] = CLAMP((data[0] - windowLevel[0])/(windowLevel[1]-windowLevel[0])*255, 0, 255);
@@ -3673,10 +3928,10 @@ unsigned char *MainWindow::fillBuffer2(int pos, Volume *vol1, float alpha) {
         signed short *data = (signed short *)d;
         size_t count = 0;
         if (vol1->elementLength == 1) {
-          for (size_t j = 0; j < (size_t)vol1->size[2]; j++) {
-            for (size_t i = 0; i < (size_t)vol1->size[0]; i++) {
+          for (size_t j = 0; j < (size_t)vol1->size[0]; j++) {
+            for (size_t i = 0; i < (size_t)vol1->size[2]; i++) {
               data = (signed short *)d;
-              data += j*(vol1->size[0]*vol1->size[1])+pos*vol1->size[0]+i;
+              data += i*(vol1->size[0]*vol1->size[1])+pos*vol1->size[0]+j;
               double val = CLAMP((data[0] - windowLevel[0])/(windowLevel[1]-windowLevel[0])*255, 0, 255);
               buffer[count*4+0] = val;
               buffer[count*4+1] = val;
@@ -3686,10 +3941,10 @@ unsigned char *MainWindow::fillBuffer2(int pos, Volume *vol1, float alpha) {
             }
           }
         } else if (vol1->elementLength == 4) {
-          for (size_t j = 0; j < (size_t)vol1->size[2]; j++) {
-            for (size_t i = 0; i < (size_t)vol1->size[0]; i++) {
+          for (size_t j = 0; j < (size_t)vol1->size[0]; j++) {
+            for (size_t i = 0; i < (size_t)vol1->size[2]; i++) {
               data = (signed short *)d;
-              data += 4*(j*(vol1->size[0]*vol1->size[1])+pos*vol1->size[0]+i);
+              data += 4*(i*(vol1->size[0]*vol1->size[1])+pos*vol1->size[0]+j);
               buffer[count*4+0] = CLAMP((data[2] - windowLevel[0])/(windowLevel[1]-windowLevel[0])*255, 0, 255);
               buffer[count*4+1] = CLAMP((data[1] - windowLevel[0])/(windowLevel[1]-windowLevel[0])*255, 0, 255);
               buffer[count*4+2] = CLAMP((data[0] - windowLevel[0])/(windowLevel[1]-windowLevel[0])*255, 0, 255);
@@ -3705,10 +3960,10 @@ unsigned char *MainWindow::fillBuffer2(int pos, Volume *vol1, float alpha) {
         unsigned short *data = (unsigned short *)d;
         size_t count = 0;
         if (vol1->elementLength == 1) {
-          for (size_t j = 0; j < (size_t)vol1->size[2]; j++) {
-            for (size_t i = 0; i < (size_t)vol1->size[0]; i++) {
+          for (size_t j = 0; j < (size_t)vol1->size[0]; j++) {
+            for (size_t i = 0; i < (size_t)vol1->size[2]; i++) {
               data = (unsigned short *)d;
-              data += j*(vol1->size[0]*vol1->size[1])+pos*vol1->size[0]+i;
+              data += i*(vol1->size[0]*vol1->size[1])+pos*vol1->size[0]+j;
               double val = CLAMP((data[0] - windowLevel[0])/(windowLevel[1]-windowLevel[0])*255, 0, 255);
               buffer[count*4+0] = val;
               buffer[count*4+1] = val;
@@ -3718,10 +3973,10 @@ unsigned char *MainWindow::fillBuffer2(int pos, Volume *vol1, float alpha) {
             }
           }
         } else if (vol1->elementLength == 4) {
-          for (size_t j = 0; j < (size_t)vol1->size[2]; j++) {
-            for (size_t i = 0; i < (size_t)vol1->size[0]; i++) {
+          for (size_t j = 0; j < (size_t)vol1->size[0]; j++) {
+            for (size_t i = 0; i < (size_t)vol1->size[2]; i++) {
               data = (unsigned short *)d;
-              data += 4*(j*(vol1->size[0]*vol1->size[1])+pos*vol1->size[0]+i);
+              data += 4*(i*(vol1->size[0]*vol1->size[1])+pos*vol1->size[0]+j);
               buffer[count*4+0] = CLAMP((data[2] - windowLevel[0])/(windowLevel[1]-windowLevel[0])*255, 0, 255);
               buffer[count*4+1] = CLAMP((data[1] - windowLevel[0])/(windowLevel[1]-windowLevel[0])*255, 0, 255);
               buffer[count*4+2] = CLAMP((data[0] - windowLevel[0])/(windowLevel[1]-windowLevel[0])*255, 0, 255);
@@ -3737,10 +3992,10 @@ unsigned char *MainWindow::fillBuffer2(int pos, Volume *vol1, float alpha) {
         signed int *data = (signed int *)d;
         size_t count = 0;
         if (vol1->elementLength == 1) {
-          for (size_t j = 0; j < (size_t)vol1->size[2]; j++) {
-            for (size_t i = 0; i < (size_t)vol1->size[0]; i++) {
+          for (size_t j = 0; j < (size_t)vol1->size[0]; j++) {
+            for (size_t i = 0; i < (size_t)vol1->size[2]; i++) {
               data = (int *)d;
-              data += j*(vol1->size[0]*vol1->size[1])+pos*vol1->size[0]+i;
+              data += i*(vol1->size[0]*vol1->size[1])+pos*vol1->size[0]+j;
               double val = CLAMP((data[0] - windowLevel[0])/(windowLevel[1]-windowLevel[0])*255, 0, 255);
               buffer[count*4+0] = val;
               buffer[count*4+1] = val;
@@ -3750,10 +4005,10 @@ unsigned char *MainWindow::fillBuffer2(int pos, Volume *vol1, float alpha) {
             }
           }
         } else if (vol1->elementLength == 4) {
-          for (size_t j = 0; j < (size_t)vol1->size[2]; j++) {
-            for (size_t i = 0; i < (size_t)vol1->size[0]; i++) {
+          for (size_t j = 0; j < (size_t)vol1->size[0]; j++) {
+            for (size_t i = 0; i < (size_t)vol1->size[2]; i++) {
               data = (int *)d;
-              data += 4*(j*(vol1->size[0]*vol1->size[1])+pos*vol1->size[0]+i);
+              data += 4*(i*(vol1->size[0]*vol1->size[1])+pos*vol1->size[0]+j);
               buffer[count*4+0] = CLAMP((data[2] - windowLevel[0])/(windowLevel[1]-windowLevel[0])*255, 0, 255);
               buffer[count*4+1] = CLAMP((data[1] - windowLevel[0])/(windowLevel[1]-windowLevel[0])*255, 0, 255);
               buffer[count*4+2] = CLAMP((data[0] - windowLevel[0])/(windowLevel[1]-windowLevel[0])*255, 0, 255);
@@ -3769,10 +4024,10 @@ unsigned char *MainWindow::fillBuffer2(int pos, Volume *vol1, float alpha) {
         unsigned int *data = (unsigned int *)d;
         size_t count = 0;
         if (vol1->elementLength == 1) {
-          for (size_t j = 0; j < (size_t)vol1->size[2]; j++) {
-            for (size_t i = 0; i < (size_t)vol1->size[0]; i++) {
+          for (size_t j = 0; j < (size_t)vol1->size[0]; j++) {
+            for (size_t i = 0; i < (size_t)vol1->size[2]; i++) {
               data = (unsigned int *)d;
-              data += j*(vol1->size[0]*vol1->size[1])+pos*vol1->size[0]+i;
+              data += i*(vol1->size[0]*vol1->size[1])+pos*vol1->size[0]+j;
               double val = CLAMP((data[0] - windowLevel[0])/(windowLevel[1]-windowLevel[0])*255, 0, 255);
               buffer[count*4+0] = val;
               buffer[count*4+1] = val;
@@ -3782,10 +4037,10 @@ unsigned char *MainWindow::fillBuffer2(int pos, Volume *vol1, float alpha) {
             }
           }
         } else if (vol1->elementLength == 4) {
-          for (size_t j = 0; j < (size_t)vol1->size[2]; j++) {
-            for (size_t i = 0; i < (size_t)vol1->size[0]; i++) {
+          for (size_t j = 0; j < (size_t)vol1->size[0]; j++) {
+            for (size_t i = 0; i < (size_t)vol1->size[2]; i++) {
               data = (unsigned int *)d;
-              data += 4*(j*(vol1->size[0]*vol1->size[1])+pos*vol1->size[0]+i);
+              data += 4*(i*(vol1->size[0]*vol1->size[1])+pos*vol1->size[0]+j);
               buffer[count*4+0] = CLAMP((data[2] - windowLevel[0])/(windowLevel[1]-windowLevel[0])*255, 0, 255);
               buffer[count*4+1] = CLAMP((data[1] - windowLevel[0])/(windowLevel[1]-windowLevel[0])*255, 0, 255);
               buffer[count*4+2] = CLAMP((data[0] - windowLevel[0])/(windowLevel[1]-windowLevel[0])*255, 0, 255);
@@ -3801,10 +4056,10 @@ unsigned char *MainWindow::fillBuffer2(int pos, Volume *vol1, float alpha) {
         float *data = (float *)d;
         size_t count = 0;
         if (vol1->elementLength == 1) {
-          for (size_t j = 0; j < (size_t)vol1->size[2]; j++) {
-            for (size_t i = 0; i < (size_t)vol1->size[0]; i++) {
+          for (size_t j = 0; j < (size_t)vol1->size[0]; j++) {
+            for (size_t i = 0; i < (size_t)vol1->size[2]; i++) {
               data = (float *)d;
-              data += j*(vol1->size[0]*vol1->size[1])+pos*vol1->size[0]+i;
+              data += i*(vol1->size[0]*vol1->size[1])+pos*vol1->size[0]+j;
               double val = CLAMP((data[0] - windowLevel[0])/(windowLevel[1]-windowLevel[0])*255, 0, 255);
               buffer[count*4+0] = val;
               buffer[count*4+1] = val;
@@ -3814,10 +4069,10 @@ unsigned char *MainWindow::fillBuffer2(int pos, Volume *vol1, float alpha) {
             }
           }
         } else if (vol1->elementLength == 4) {
-          for (size_t j = 0; j < (size_t)vol1->size[2]; j++) {
-            for (size_t i = 0; i < (size_t)vol1->size[0]; i++) {
+          for (size_t j = 0; j < (size_t)vol1->size[0]; j++) {
+            for (size_t i = 0; i < (size_t)vol1->size[2]; i++) {
               data = (float *)d;
-              data += 4*(j*(vol1->size[0]*vol1->size[1])+pos*vol1->size[0]+i);
+              data += 4*(i*(vol1->size[0]*vol1->size[1])+pos*vol1->size[0]+j);
               buffer[count*4+0] = CLAMP((data[2] - windowLevel[0])/(windowLevel[1]-windowLevel[0])*255, 0, 255);
               buffer[count*4+1] = CLAMP((data[1] - windowLevel[0])/(windowLevel[1]-windowLevel[0])*255, 0, 255);
               buffer[count*4+2] = CLAMP((data[0] - windowLevel[0])/(windowLevel[1]-windowLevel[0])*255, 0, 255);
@@ -3843,10 +4098,10 @@ unsigned char *MainWindow::fillBuffer2AsColor(int pos, ScalarVolume *vol1, float
     case MyPrimType::CHAR : {
         unsigned char *data = (unsigned char *)d;
         size_t count = 0;
-        for (size_t j = 0; j < (size_t)vol1->size[2]; j++) {
-          for (size_t i = 0; i < (size_t)vol1->size[0]; i++) {
+        for (size_t j = 0; j < (size_t)vol1->size[0]; j++) {
+          for (size_t i = 0; i < (size_t)vol1->size[2]; i++) {
             data = (unsigned char *)d;
-            data += j*(vol1->size[0]*vol1->size[1])+pos*vol1->size[0]+i;
+            data += i*(vol1->size[0]*vol1->size[1])+pos*vol1->size[0]+j;
             int label = data[0];
             if (label > 0)
               if (!vol1->materialVisibility[label])
@@ -3863,10 +4118,10 @@ unsigned char *MainWindow::fillBuffer2AsColor(int pos, ScalarVolume *vol1, float
     case MyPrimType::SHORT : {
         signed short *data = (signed short *)d;
         size_t count = 0;
-        for (size_t j = 0; j < (size_t)vol1->size[2]; j++) {
-          for (size_t i = 0; i < (size_t)vol1->size[0]; i++) {
+        for (size_t j = 0; j < (size_t)vol1->size[0]; j++) {
+          for (size_t i = 0; i < (size_t)vol1->size[2]; i++) {
             data = (signed short *)d;
-            data += j*(vol1->size[0]*vol1->size[1])+pos*vol1->size[0]+i;
+            data += i*(vol1->size[0]*vol1->size[1])+pos*vol1->size[0]+j;
             int label = data[0];
             if (label > 0)
               if (!vol1->materialVisibility[label])
@@ -3883,10 +4138,10 @@ unsigned char *MainWindow::fillBuffer2AsColor(int pos, ScalarVolume *vol1, float
     case MyPrimType::USHORT : {
         unsigned short *data = (unsigned short *)d;
         size_t count = 0;
-        for (size_t j = 0; j < (size_t)vol1->size[2]; j++) {
-          for (size_t i = 0; i < (size_t)vol1->size[0]; i++) {
+        for (size_t j = 0; j < (size_t)vol1->size[0]; j++) {
+          for (size_t i = 0; i < (size_t)vol1->size[2]; i++) {
             data = (unsigned short *)d;
-            data += j*(vol1->size[0]*vol1->size[1])+pos*vol1->size[0]+i;
+            data += i*(vol1->size[0]*vol1->size[1])+pos*vol1->size[0]+j;
             int label = data[0];
             if (label > 0)
               if (!vol1->materialVisibility[label])
@@ -3903,10 +4158,10 @@ unsigned char *MainWindow::fillBuffer2AsColor(int pos, ScalarVolume *vol1, float
     case MyPrimType::INT : {
         signed int *data = (signed int *)d;
         size_t count = 0;
-        for (size_t j = 0; j < (size_t)vol1->size[2]; j++) {
-          for (size_t i = 0; i < (size_t)vol1->size[0]; i++) {
+        for (size_t j = 0; j < (size_t)vol1->size[0]; j++) {
+          for (size_t i = 0; i < (size_t)vol1->size[2]; i++) {
             data = (int *)d;
-            data += j*(vol1->size[0]*vol1->size[1])+pos*vol1->size[0]+i;
+            data += i*(vol1->size[0]*vol1->size[1])+pos*vol1->size[0]+j;
             int label = data[0];
             if (label > 0)
               if (!vol1->materialVisibility[label])
@@ -3923,10 +4178,10 @@ unsigned char *MainWindow::fillBuffer2AsColor(int pos, ScalarVolume *vol1, float
     case MyPrimType::UINT : {
         unsigned int *data = (unsigned int *)d;
         size_t count = 0;
-        for (size_t j = 0; j < (size_t)vol1->size[2]; j++) {
-          for (size_t i = 0; i < (size_t)vol1->size[0]; i++) {
+        for (size_t j = 0; j < (size_t)vol1->size[0]; j++) {
+          for (size_t i = 0; i < (size_t)vol1->size[2]; i++) {
             data = (unsigned int *)d;
-            data += j*(vol1->size[0]*vol1->size[1])+pos*vol1->size[0]+i;
+            data += i*(vol1->size[0]*vol1->size[1])+pos*vol1->size[0]+j;
             int label = data[0];
             if (label > 0)
               if (!vol1->materialVisibility[label])
@@ -3975,7 +4230,7 @@ unsigned char * MainWindow::fillBuffer1FromHBuffer(int pos, ScalarVolume *vol1, 
 // create a label field from the volume
 unsigned char * MainWindow::fillBuffer2FromHBuffer(int pos, ScalarVolume *vol1, float alpha) {
 
-  if ((size_t)lab1->size[0]* lab1->size[1] * lab1->size[2] !=
+  if ((size_t)vol1->size[0]* vol1->size[1] * vol1->size[2] !=
       hbuffer.size()) {
     fprintf(stderr, "Error: hbuffer does not have same size as volume");
     return NULL;
@@ -3983,10 +4238,10 @@ unsigned char * MainWindow::fillBuffer2FromHBuffer(int pos, ScalarVolume *vol1, 
   // create a correct buffer for the image (ARGB32)
   unsigned char *buffer = (unsigned char*)malloc(4 * vol1->size[0] * vol1->size[2]);
 
-  for (int j = 0; j < vol1->size[2]; j++) {
-    for (int i = 0; i < vol1->size[0]; i++) {
-      size_t idx = j*(vol1->size[0]*vol1->size[1])+pos*vol1->size[0]+i;
-      size_t idx2 = j*vol1->size[0]+i;
+  for (int j = 0; j < vol1->size[0]; j++) {
+    for (int i = 0; i < vol1->size[2]; i++) {
+      size_t idx = i*((size_t)vol1->size[0]*vol1->size[1])+pos*vol1->size[0]+j;
+      size_t idx2 = j*(size_t)vol1->size[2]+i;
       buffer[idx2*4+0] = 0; // blue
       buffer[idx2*4+1] = 0; // green
       buffer[idx2*4+2] = (int)hbuffer[idx] * 255; // red
@@ -3999,7 +4254,7 @@ unsigned char * MainWindow::fillBuffer2FromHBuffer(int pos, ScalarVolume *vol1, 
 // create a label field from the volume
 unsigned char * MainWindow::fillBuffer3FromHBuffer(int pos, ScalarVolume *vol1, float alpha) {
 
-  if ((size_t)lab1->size[0]* lab1->size[1] * lab1->size[2] !=
+  if ((size_t)vol1->size[0]* vol1->size[1] * vol1->size[2] !=
       hbuffer.size()) {
     fprintf(stderr, "Error: hbuffer does not have same size as volume");
     return NULL;
@@ -4009,10 +4264,10 @@ unsigned char * MainWindow::fillBuffer3FromHBuffer(int pos, ScalarVolume *vol1, 
   unsigned char *buffer = (unsigned char*)malloc(4 * vol1->size[1] * vol1->size[2]);
 
   // todo: use loop over bitfield instead
-  for (int j = 0; j < vol1->size[2]; j++) {
-    for (int i = 0; i < vol1->size[1]; i++) {
-      size_t idx = j*(vol1->size[0]*vol1->size[1])+i*vol1->size[0]+pos;
-      size_t idx2 = j*vol1->size[1]+i;
+  for (int j = 0; j < vol1->size[1]; j++) {
+    for (int i = 0; i < vol1->size[2]; i++) {
+      size_t idx = i*(vol1->size[0]*vol1->size[1])+j*vol1->size[0]+pos;
+      size_t idx2 = j*vol1->size[2]+i;
       buffer[idx2*4+0] = 0; // blue
       buffer[idx2*4+1] = 0; // green
       buffer[idx2*4+2] = (int)hbuffer[idx] * 255; // red
@@ -4032,10 +4287,10 @@ unsigned char *MainWindow::fillBuffer3(int pos, Volume *vol1, float alpha) {
         unsigned char *data = (unsigned char *)d;
         size_t count = 0;
         if (vol1->elementLength == 1) {
-          for (size_t j = 0; j < (size_t)vol1->size[2]; j++) {
-            for (size_t i = 0; i < (size_t)vol1->size[1]; i++) {
+          for (size_t j = 0; j < (size_t)vol1->size[1]; j++) {
+            for (size_t i = 0; i < (size_t)vol1->size[2]; i++) {
               data = (unsigned char *)d;
-              data += j*(vol1->size[0]*vol1->size[1])+i*vol1->size[0]+pos;
+              data += i*(vol1->size[0]*vol1->size[1])+j*vol1->size[0]+pos;
               double val = CLAMP((data[0] - windowLevel[0])/(windowLevel[1]-windowLevel[0])*255, 0, 255);
               buffer[count*4+0] = val;
               buffer[count*4+1] = val;
@@ -4045,10 +4300,10 @@ unsigned char *MainWindow::fillBuffer3(int pos, Volume *vol1, float alpha) {
             }
           }
         } else if (vol1->elementLength == 4) {
-          for (size_t j = 0; j < (size_t)vol1->size[2]; j++) {
-            for (size_t i = 0; i < (size_t)vol1->size[1]; i++) {
+          for (size_t j = 0; j < (size_t)vol1->size[1]; j++) {
+            for (size_t i = 0; i < (size_t)vol1->size[2]; i++) {
               data = (unsigned char *)d;
-              data += 4*(j*(vol1->size[0]*vol1->size[1])+i*vol1->size[0]+pos);
+              data += 4*(i*(vol1->size[0]*vol1->size[1])+j*vol1->size[0]+pos);
               buffer[count*4+0] = CLAMP((data[2] - windowLevel[0])/(windowLevel[1]-windowLevel[0])*255, 0, 255);
               buffer[count*4+1] = CLAMP((data[1] - windowLevel[0])/(windowLevel[1]-windowLevel[0])*255, 0, 255);
               buffer[count*4+2] = CLAMP((data[0] - windowLevel[0])/(windowLevel[1]-windowLevel[0])*255, 0, 255);
@@ -4063,10 +4318,10 @@ unsigned char *MainWindow::fillBuffer3(int pos, Volume *vol1, float alpha) {
         signed short *data = (signed short *)d;
         size_t count = 0;
         if (vol1->elementLength == 1) {
-          for (size_t j = 0; j < (size_t)vol1->size[2]; j++) {
-            for (size_t i = 0; i < (size_t)vol1->size[1]; i++) {
+          for (size_t j = 0; j < (size_t)vol1->size[1]; j++) {
+            for (size_t i = 0; i < (size_t)vol1->size[2]; i++) {
               data = (signed short *)d;
-              data += j*(vol1->size[0]*vol1->size[1])+i*vol1->size[0]+pos;
+              data += i*(vol1->size[0]*vol1->size[1])+j*vol1->size[0]+pos;
               double val = CLAMP((data[0] - windowLevel[0])/(windowLevel[1]-windowLevel[0])*255, 0, 255);
               buffer[count*4+0] = val;
               buffer[count*4+1] = val;
@@ -4076,10 +4331,10 @@ unsigned char *MainWindow::fillBuffer3(int pos, Volume *vol1, float alpha) {
             }
           }
         } else if (vol1->elementLength == 4) {
-          for (size_t j = 0; j < (size_t)vol1->size[2]; j++) {
-            for (size_t i = 0; i < (size_t)vol1->size[1]; i++) {
+          for (size_t j = 0; j < (size_t)vol1->size[1]; j++) {
+            for (size_t i = 0; i < (size_t)vol1->size[2]; i++) {
               data = (signed short *)d;
-              data += 4*(j*(vol1->size[0]*vol1->size[1])+i*vol1->size[0]+pos);
+              data += 4*(i*(vol1->size[0]*vol1->size[1])+j*vol1->size[0]+pos);
               buffer[count*4+0] = CLAMP((data[2] - windowLevel[0])/(windowLevel[1]-windowLevel[0])*255, 0, 255);
               buffer[count*4+1] = CLAMP((data[1] - windowLevel[0])/(windowLevel[1]-windowLevel[0])*255, 0, 255);
               buffer[count*4+2] = CLAMP((data[0] - windowLevel[0])/(windowLevel[1]-windowLevel[0])*255, 0, 255);
@@ -4094,10 +4349,10 @@ unsigned char *MainWindow::fillBuffer3(int pos, Volume *vol1, float alpha) {
         unsigned short *data = (unsigned short *)d;
         size_t count = 0;
         if (vol1->elementLength == 1) {
-          for (size_t j = 0; j < (size_t)vol1->size[2]; j++) {
-            for (size_t i = 0; i < (size_t)vol1->size[1]; i++) {
+          for (size_t j = 0; j < (size_t)vol1->size[1]; j++) {
+            for (size_t i = 0; i < (size_t)vol1->size[2]; i++) {
               data = (unsigned short *)d;
-              data += j*(vol1->size[0]*vol1->size[1])+i*vol1->size[0]+pos;
+              data += i*(vol1->size[0]*vol1->size[1])+j*vol1->size[0]+pos;
               double val = CLAMP((data[0] - windowLevel[0])/(windowLevel[1]-windowLevel[0])*255, 0, 255);
               buffer[count*4+0] = val;
               buffer[count*4+1] = val;
@@ -4107,10 +4362,10 @@ unsigned char *MainWindow::fillBuffer3(int pos, Volume *vol1, float alpha) {
             }
           }
         } else if (vol1->elementLength == 4) {
-          for (size_t j = 0; j < (size_t)vol1->size[2]; j++) {
-            for (size_t i = 0; i < (size_t)vol1->size[1]; i++) {
+          for (size_t j = 0; j < (size_t)vol1->size[1]; j++) {
+            for (size_t i = 0; i < (size_t)vol1->size[2]; i++) {
               data = (unsigned short *)d;
-              data += 4*(j*(vol1->size[0]*vol1->size[1])+i*vol1->size[0]+pos);
+              data += 4*(i*(vol1->size[0]*vol1->size[1])+j*vol1->size[0]+pos);
               buffer[count*4+0] = CLAMP((data[2] - windowLevel[0])/(windowLevel[1]-windowLevel[0])*255, 0, 255);
               buffer[count*4+1] = CLAMP((data[1] - windowLevel[0])/(windowLevel[1]-windowLevel[0])*255, 0, 255);
               buffer[count*4+2] = CLAMP((data[0] - windowLevel[0])/(windowLevel[1]-windowLevel[0])*255, 0, 255);
@@ -4125,10 +4380,10 @@ unsigned char *MainWindow::fillBuffer3(int pos, Volume *vol1, float alpha) {
         signed int *data = (signed int *)d;
         size_t count = 0;
         if (vol1->elementLength == 1) {
-          for (size_t j = 0; j < (size_t)vol1->size[2]; j++) {
-            for (size_t i = 0; i < (size_t)vol1->size[1]; i++) {
+          for (size_t j = 0; j < (size_t)vol1->size[1]; j++) {
+            for (size_t i = 0; i < (size_t)vol1->size[2]; i++) {
               data = (int *)d;
-              data += j*(vol1->size[0]*vol1->size[1])+i*vol1->size[0]+pos;
+              data += i*(vol1->size[0]*vol1->size[1])+j*vol1->size[0]+pos;
               double val = CLAMP((data[0] - windowLevel[0])/(windowLevel[1]-windowLevel[0])*255, 0, 255);
               buffer[count*4+0] = val;
               buffer[count*4+1] = val;
@@ -4138,10 +4393,10 @@ unsigned char *MainWindow::fillBuffer3(int pos, Volume *vol1, float alpha) {
             }
           }
         } else if (vol1->elementLength == 4) {
-          for (size_t j = 0; j < (size_t)vol1->size[2]; j++) {
-            for (size_t i = 0; i < (size_t)vol1->size[1]; i++) {
+          for (size_t j = 0; j < (size_t)vol1->size[1]; j++) {
+            for (size_t i = 0; i < (size_t)vol1->size[2]; i++) {
               data = (int *)d;
-              data += 4*(j*(vol1->size[0]*vol1->size[1])+i*vol1->size[0]+pos);
+              data += 4*(i*(vol1->size[0]*vol1->size[1])+j*vol1->size[0]+pos);
               buffer[count*4+0] = CLAMP((data[2] - windowLevel[0])/(windowLevel[1]-windowLevel[0])*255, 0, 255);
               buffer[count*4+1] = CLAMP((data[1] - windowLevel[0])/(windowLevel[1]-windowLevel[0])*255, 0, 255);
               buffer[count*4+2] = CLAMP((data[0] - windowLevel[0])/(windowLevel[1]-windowLevel[0])*255, 0, 255);
@@ -4156,10 +4411,10 @@ unsigned char *MainWindow::fillBuffer3(int pos, Volume *vol1, float alpha) {
         unsigned int *data = (unsigned int *)d;
         size_t count = 0;
         if (vol1->elementLength == 1) {
-          for (size_t j = 0; j < (size_t)vol1->size[2]; j++) {
-            for (size_t i = 0; i < (size_t)vol1->size[1]; i++) {
+          for (size_t j = 0; j < (size_t)vol1->size[1]; j++) {
+            for (size_t i = 0; i < (size_t)vol1->size[2]; i++) {
               data = (unsigned int *)d;
-              data += j*(vol1->size[0]*vol1->size[1])+i*vol1->size[0]+pos;
+              data += i*(vol1->size[0]*vol1->size[1])+j*vol1->size[0]+pos;
               double val = CLAMP((data[0] - windowLevel[0])/(windowLevel[1]-windowLevel[0])*255, 0, 255);
               buffer[count*4+0] = val;
               buffer[count*4+1] = val;
@@ -4169,10 +4424,10 @@ unsigned char *MainWindow::fillBuffer3(int pos, Volume *vol1, float alpha) {
             }
           }
         } else if (vol1->elementLength == 4) {
-          for (size_t j = 0; j < (size_t)vol1->size[2]; j++) {
-            for (size_t i = 0; i < (size_t)vol1->size[1]; i++) {
+          for (size_t j = 0; j < (size_t)vol1->size[1]; j++) {
+            for (size_t i = 0; i < (size_t)vol1->size[2]; i++) {
               data = (unsigned int *)d;
-              data += 4*(j*(vol1->size[0]*vol1->size[1])+i*vol1->size[0]+pos);
+              data += 4*(i*(vol1->size[0]*vol1->size[1])+j*vol1->size[0]+pos);
               buffer[count*4+0] = CLAMP((data[2] - windowLevel[0])/(windowLevel[1]-windowLevel[0])*255, 0, 255);
               buffer[count*4+1] = CLAMP((data[1] - windowLevel[0])/(windowLevel[1]-windowLevel[0])*255, 0, 255);
               buffer[count*4+2] = CLAMP((data[0] - windowLevel[0])/(windowLevel[1]-windowLevel[0])*255, 0, 255);
@@ -4187,10 +4442,10 @@ unsigned char *MainWindow::fillBuffer3(int pos, Volume *vol1, float alpha) {
         float *data = (float *)d;
         size_t count = 0;
         if (vol1->elementLength == 1) {
-          for (size_t j = 0; j < (size_t)vol1->size[2]; j++) {
-            for (size_t i = 0; i < (size_t)vol1->size[0]; i++) {
+          for (size_t j = 0; j < (size_t)vol1->size[1]; j++) {
+            for (size_t i = 0; i < (size_t)vol1->size[2]; i++) {
               data = (float *)d;
-              data += j*(vol1->size[0]*vol1->size[1])+i*vol1->size[0]+pos;
+              data += i*(vol1->size[0]*vol1->size[1])+j*vol1->size[0]+pos;
               double val = CLAMP((data[0] - windowLevel[0])/(windowLevel[1]-windowLevel[0])*255, 0, 255);
               buffer[count*4+0] = val;
               buffer[count*4+1] = val;
@@ -4200,10 +4455,10 @@ unsigned char *MainWindow::fillBuffer3(int pos, Volume *vol1, float alpha) {
             }
           }
         } else if (vol1->elementLength == 4) {
-          for (size_t j = 0; j < (size_t)vol1->size[2]; j++) {
-            for (size_t i = 0; i < (size_t)vol1->size[1]; i++) {
+          for (size_t j = 0; j < (size_t)vol1->size[1]; j++) {
+            for (size_t i = 0; i < (size_t)vol1->size[2]; i++) {
               data = (float *)d;
-              data += 4*(j*(vol1->size[0]*vol1->size[1])+i*vol1->size[0]+pos);
+              data += 4*(i*(vol1->size[0]*vol1->size[1])+j*vol1->size[0]+pos);
               buffer[count*4+0] = CLAMP((data[2] - windowLevel[0])/(windowLevel[1]-windowLevel[0])*255, 0, 255);
               buffer[count*4+1] = CLAMP((data[1] - windowLevel[0])/(windowLevel[1]-windowLevel[0])*255, 0, 255);
               buffer[count*4+2] = CLAMP((data[0] - windowLevel[0])/(windowLevel[1]-windowLevel[0])*255, 0, 255);
@@ -4228,10 +4483,10 @@ unsigned char *MainWindow::fillBuffer3AsColor(int pos, ScalarVolume *vol1, float
     case MyPrimType::CHAR : {
         unsigned char *data = (unsigned char *)d;
         size_t count = 0;
-        for (size_t j = 0; j < (size_t)vol1->size[2]; j++) {
-          for (size_t i = 0; i < (size_t)vol1->size[1]; i++) {
+        for (size_t j = 0; j < (size_t)vol1->size[1]; j++) {
+          for (size_t i = 0; i < (size_t)vol1->size[2]; i++) {
             data = (unsigned char *)d;
-            data += j*(vol1->size[0]*vol1->size[1])+i*vol1->size[0]+pos;
+            data += i*(vol1->size[0]*vol1->size[1])+j*vol1->size[0]+pos;
             int label = data[0];
             if (label > 0)
               if (!vol1->materialVisibility[label])
@@ -4248,10 +4503,10 @@ unsigned char *MainWindow::fillBuffer3AsColor(int pos, ScalarVolume *vol1, float
     case MyPrimType::SHORT : {
         signed short *data = (signed short *)d;
         size_t count = 0;
-        for (size_t j = 0; j < (size_t)vol1->size[2]; j++) {
-          for (size_t i = 0; i < (size_t)vol1->size[0]; i++) {
+        for (size_t j = 0; j < (size_t)vol1->size[1]; j++) {
+          for (size_t i = 0; i < (size_t)vol1->size[2]; i++) {
             data = (signed short *)d;
-            data += j*(vol1->size[0]*vol1->size[1])+i*vol1->size[0]+pos;
+            data += i*(vol1->size[0]*vol1->size[1])+j*vol1->size[0]+pos;
             int label = data[0];
             if (label > 0)
               if (!vol1->materialVisibility[label])
@@ -4268,10 +4523,10 @@ unsigned char *MainWindow::fillBuffer3AsColor(int pos, ScalarVolume *vol1, float
     case MyPrimType::USHORT : {
         unsigned short *data = (unsigned short *)d;
         size_t count = 0;
-        for (size_t j = 0; j < (size_t)vol1->size[2]; j++) {
-          for (size_t i = 0; i < (size_t)vol1->size[0]; i++) {
+        for (size_t j = 0; j < (size_t)vol1->size[1]; j++) {
+          for (size_t i = 0; i < (size_t)vol1->size[2]; i++) {
             data = (unsigned short *)d;
-            data += j*(vol1->size[0]*vol1->size[1])+i*vol1->size[0]+pos;
+            data += i*(vol1->size[0]*vol1->size[1])+j*vol1->size[0]+pos;
             int label = data[0];
             if (label > 0)
               if (!vol1->materialVisibility[label])
@@ -4288,10 +4543,10 @@ unsigned char *MainWindow::fillBuffer3AsColor(int pos, ScalarVolume *vol1, float
     case MyPrimType::INT : {
         signed int *data = (signed int *)d;
         size_t count = 0;
-        for (size_t j = 0; j < (size_t)vol1->size[2]; j++) {
-          for (size_t i = 0; i < (size_t)vol1->size[0]; i++) {
+        for (size_t j = 0; j < (size_t)vol1->size[1]; j++) {
+          for (size_t i = 0; i < (size_t)vol1->size[2]; i++) {
             data = (int *)d;
-            data += j*(vol1->size[0]*vol1->size[1])+i*vol1->size[0]+pos;
+            data += i*(vol1->size[0]*vol1->size[1])+j*vol1->size[0]+pos;
             int label = data[0];
             if (label > 0)
               if (!vol1->materialVisibility[label])
@@ -4308,10 +4563,10 @@ unsigned char *MainWindow::fillBuffer3AsColor(int pos, ScalarVolume *vol1, float
     case MyPrimType::UINT : {
         unsigned int *data = (unsigned int *)d;
         size_t count = 0;
-        for (size_t j = 0; j < (size_t)vol1->size[2]; j++) {
-          for (size_t i = 0; i < (size_t)vol1->size[0]; i++) {
+        for (size_t j = 0; j < (size_t)vol1->size[1]; j++) {
+          for (size_t i = 0; i < (size_t)vol1->size[2]; i++) {
             data = (unsigned int *)d;
-            data += j*(vol1->size[0]*vol1->size[1])+i*vol1->size[0]+pos;
+            data += i*(vol1->size[0]*vol1->size[1])+j*vol1->size[0]+pos;
             int label = data[0];
             if (label > 0)
               if (!vol1->materialVisibility[label])
@@ -4400,7 +4655,7 @@ void MainWindow::updateImage2(int pos) { // [x, 0, z]
   buffer1 = fillBuffer2(pos, vol1, 255);
   if (!buffer1)
     return;
-  QImage imageVol1(buffer1, vol1->size[0], vol1->size[2], QImage::Format_ARGB32);
+  QImage imageVol1(buffer1, vol1->size[2], vol1->size[0], QImage::Format_ARGB32);
   QImage resultImage(imageVol1);
   // resultImage = QImage(imageVol1.size(), QImage::Format_ARGB32_Premultiplied);
 
@@ -4408,12 +4663,12 @@ void MainWindow::updateImage2(int pos) { // [x, 0, z]
     buffer2 = fillBuffer2AsColor(pos, (ScalarVolume *)lab1, 128);
     if (!buffer2)
       return;
-    QImage imageLab1(buffer2, lab1->size[0], lab1->size[2], QImage::Format_ARGB32);
+    QImage imageLab1(buffer2, lab1->size[2], lab1->size[0], QImage::Format_ARGB32);
 
     buffer3 = fillBuffer2FromHBuffer(pos, (ScalarVolume *)lab1, 180);
     if (!buffer3)
       return;
-    QImage imageHBuffer2(buffer3, lab1->size[0], lab1->size[2], QImage::Format_ARGB32);
+    QImage imageHBuffer2(buffer3, lab1->size[2], lab1->size[0], QImage::Format_ARGB32);
 
     //QPainter::CompositionMode mode = QPainter::CompositionMode_Overlay;
     QPainter::CompositionMode mode = QPainter::CompositionMode_SourceOver;
@@ -4453,19 +4708,19 @@ void MainWindow::updateImage3(int pos) { // [0, y, z]
   buffer1 = fillBuffer3(pos, vol1, 255);
   if (!buffer1)
     return;
-  QImage imageVol1(buffer1, vol1->size[1], vol1->size[2], QImage::Format_ARGB32);
+  QImage imageVol1(buffer1, vol1->size[2], vol1->size[1], QImage::Format_ARGB32);
   QImage resultImage(imageVol1);
 
   if (lab1 != NULL && lab1->elementLength == 1) {
     buffer2 = fillBuffer3AsColor(pos, (ScalarVolume *)lab1, 128);
     if (!buffer2)
       return;
-    QImage imageLab1(buffer2, lab1->size[1], lab1->size[2], QImage::Format_ARGB32);
+    QImage imageLab1(buffer2, lab1->size[2], lab1->size[1], QImage::Format_ARGB32);
 
     buffer3 = fillBuffer3FromHBuffer(pos, (ScalarVolume *)lab1, 180);
     if (!buffer3)
       return;
-    QImage imageHBuffer3(buffer3, lab1->size[1], lab1->size[2], QImage::Format_ARGB32);
+    QImage imageHBuffer3(buffer3, lab1->size[2], lab1->size[1], QImage::Format_ARGB32);
 
     // QPainter::CompositionMode mode = QPainter::CompositionMode_Overlay;
     QPainter::CompositionMode mode = QPainter::CompositionMode_SourceOver;
@@ -4655,7 +4910,7 @@ void MainWindow::closeEvent(QCloseEvent *event)
 
 void MainWindow::on_treeWidget_itemChanged(QTreeWidgetItem *item, int column)
 {
-  if (!lab1) {
+  if (!lab1 || !item) {
     return;
   }
 
@@ -4759,4 +5014,35 @@ void MainWindow::on_pickTool_toggled(bool checked)
     currentTool = MainWindow::PickTool;
   } else
     currentTool = MainWindow::None;
+}
+
+// navigate to the first slice that shows the currently highlighted material
+void MainWindow::on_pushButton_Show_clicked()
+{
+  if (!lab1)
+    return;
+
+  // highlighted material is:
+  QTreeWidgetItem *item = ui->treeWidget->currentItem();
+  if (!item)
+    return;
+  int idx = item->text(1).toInt();
+
+  size_t firstHit = 0;
+  for (size_t i = 0; i < (size_t)lab1->size[0] * lab1->size[1] * lab1->size[2]; i++) {
+    if (lab1->dataPtr[i] == idx) {
+       firstHit = i;
+       break;
+    }
+  }
+  // what are the coordinates?
+  int z = (int)floor(firstHit/((size_t)lab1->size[0]*lab1->size[1]));
+  int y = (int)floor( (firstHit - z*((size_t)lab1->size[0]*lab1->size[1])) / lab1->size[0] );
+  int x = firstHit - z*((size_t)lab1->size[0]*lab1->size[1]) - y*lab1->size[0];
+
+  // set this location and update
+  slicePosition[0] = x;
+  slicePosition[1] = y;
+  slicePosition[2] = z;
+  update();
 }

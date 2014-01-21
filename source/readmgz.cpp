@@ -1,6 +1,14 @@
 #include <QMessageBox>
 #include "readmgz.h"
 
+#include <qfileinfo>
+#include <QTemporaryFile>
+#include <fstream>
+#include <iostream>
+#include <boost/iostreams/filtering_streambuf.hpp>
+#include <boost/iostreams/filter/gzip.hpp>
+#include <boost/iostreams/copy.hpp>
+
 struct endHeader {
         float tr;
         float flipAngle;
@@ -178,7 +186,31 @@ void ReadMGZ::writeInt4(int value, FILE *fp) {
 
 std::vector<ScalarVolume*> *ReadMGZ::getVolume() {
 
-    FILE* fp = fopen(filename.toLatin1().constData(),"rb");
+    QString fn = filename;
+
+    // if the file is gzip compressed uncompress first
+/*    QFileInfo name = QFileInfo(filename);
+    if (name.suffix() == "mgz") {
+      // uncompress first, lost uncompressed file instead
+      QTemporaryFile file;
+      QString tempFn;
+      if (file.open()) {
+        tempFn = file.fileName();
+      }
+      std::ifstream file1(filename.toLatin1().constData(),
+                         std::ios_base::in | std::ios_base::binary);
+      boost::iostreams::filtering_streambuf < boost::iostreams::input > in;
+      in.push(boost::iostreams::gzip_decompressor());
+      in.push(file1);
+
+      std::ofstream file2(tempFn.toLatin1().constData(),
+                         std::ios_base::out | std::ios_base::binary);
+
+      boost::iostreams::copy(in, file2);
+
+    } */
+
+    FILE* fp = fopen(fn.toLatin1().constData(),"rb");
 
     if (!fp) {
       return NULL;

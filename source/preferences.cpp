@@ -15,6 +15,10 @@ Preferences::Preferences(QWidget *parent) :
   ui->GrayHighValue->setValue( settings.value("Preferences/grayHighValue", 0.99).toDouble() );
   ui->ColorLowValue->setValue( settings.value("Preferences/colorLowValue", 0.05).toDouble() );
   ui->ColorHighValue->setValue( settings.value("Preferences/colorHighValue", 0.9999).toDouble() );
+  ui->autoSaveLabels->setChecked( settings.value("Preferences/autoSaveLabel", true).toBool() );
+  ui->preferences_NumberRecentFiles->setValue( getMaxNumberRecentFiles() );
+  ui->preferences_brushSize->setValue( brushSize() );
+  ui->preferences_undoSteps->setValue( undoSteps() );
 }
 
 Preferences::~Preferences()

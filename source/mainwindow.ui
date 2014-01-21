@@ -205,237 +205,255 @@ color: rgb(255, 255, 255);</string>
        <property name="frameShadow">
         <enum>QFrame::Raised</enum>
        </property>
-       <layout class="QGridLayout" name="gridLayout">
-        <item row="0" column="0">
-         <layout class="QVBoxLayout" name="verticalLayout_2">
-          <item>
-           <layout class="QGridLayout" name="gridLayout_4">
-            <item row="1" column="1">
-             <widget class="QPushButton" name="pushButton_2">
-              <property name="text">
-               <string>Delete Material</string>
-              </property>
-             </widget>
-            </item>
-            <item row="1" column="0">
-             <widget class="QPushButton" name="pushButton">
-              <property name="text">
-               <string>Add Material</string>
-              </property>
-             </widget>
-            </item>
-            <item row="0" column="0">
-             <widget class="QPushButton" name="pushButton_5">
-              <property name="text">
-               <string>Highlight</string>
-              </property>
-             </widget>
-            </item>
-           </layout>
-          </item>
-          <item>
-           <widget class="QScrollArea" name="scrollArea">
-            <property name="widgetResizable">
-             <bool>true</bool>
+       <layout class="QVBoxLayout" name="verticalLayout_2">
+        <item>
+         <layout class="QGridLayout" name="gridLayout">
+          <item row="0" column="0">
+           <widget class="QPushButton" name="pushButton_5">
+            <property name="toolTip">
+             <string>Create a highlight from the currently selected label.</string>
             </property>
-            <widget class="QWidget" name="scrollAreaWidgetContents">
-             <property name="geometry">
-              <rect>
-               <x>0</x>
-               <y>0</y>
-               <width>280</width>
-               <height>352</height>
-              </rect>
-             </property>
-             <layout class="QGridLayout" name="gridLayout_2">
-              <item row="0" column="0">
-               <widget class="QTreeWidget" name="treeWidget">
-                <property name="styleSheet">
-                 <string notr="true"/>
-                </property>
-                <property name="frameShape">
-                 <enum>QFrame::NoFrame</enum>
-                </property>
-                <property name="frameShadow">
-                 <enum>QFrame::Plain</enum>
-                </property>
-                <property name="lineWidth">
-                 <number>0</number>
-                </property>
-                <property name="alternatingRowColors">
-                 <bool>true</bool>
-                </property>
-                <property name="sortingEnabled">
-                 <bool>true</bool>
-                </property>
-                <property name="animated">
-                 <bool>true</bool>
-                </property>
-                <column>
-                 <property name="text">
-                  <string notr="true">1</string>
-                 </property>
-                </column>
-               </widget>
-              </item>
-             </layout>
-            </widget>
+            <property name="text">
+             <string>Highlight</string>
+            </property>
            </widget>
           </item>
-          <item>
-           <widget class="QFrame" name="frame_4">
-            <property name="minimumSize">
-             <size>
-              <width>0</width>
-              <height>100</height>
-             </size>
+          <item row="0" column="1">
+           <widget class="QPushButton" name="pushButton_Show">
+            <property name="toolTip">
+             <string>Change the slice locations to show the first occurency of the currently highlighted label in the volume.</string>
             </property>
-            <property name="frameShape">
-             <enum>QFrame::StyledPanel</enum>
+            <property name="text">
+             <string>Show</string>
             </property>
-            <property name="frameShadow">
-             <enum>QFrame::Raised</enum>
+           </widget>
+          </item>
+          <item row="1" column="0">
+           <widget class="QPushButton" name="pushButton">
+            <property name="toolTip">
+             <string>Add a label to the list.</string>
             </property>
-            <widget class="QToolButton" name="toolButton">
-             <property name="geometry">
-              <rect>
-               <x>20</x>
-               <y>10</y>
-               <width>51</width>
-               <height>23</height>
-              </rect>
-             </property>
-             <property name="text">
-              <string>B/C</string>
-             </property>
-             <property name="checkable">
-              <bool>true</bool>
-             </property>
-            </widget>
-            <widget class="QToolButton" name="toolButton_2">
-             <property name="geometry">
-              <rect>
-               <x>80</x>
-               <y>40</y>
-               <width>51</width>
-               <height>23</height>
-              </rect>
-             </property>
-             <property name="text">
-              <string>Brush</string>
-             </property>
-             <property name="checkable">
-              <bool>true</bool>
-             </property>
-            </widget>
-            <widget class="QToolButton" name="toolButton_3">
-             <property name="geometry">
-              <rect>
-               <x>20</x>
-               <y>70</y>
-               <width>51</width>
-               <height>21</height>
-              </rect>
-             </property>
-             <property name="text">
-              <string>Clear</string>
-             </property>
-            </widget>
-            <widget class="QToolButton" name="toolButton_4">
-             <property name="geometry">
-              <rect>
-               <x>80</x>
-               <y>70</y>
-               <width>51</width>
-               <height>21</height>
-              </rect>
-             </property>
-             <property name="text">
-              <string>Add</string>
-             </property>
-            </widget>
-            <widget class="QToolButton" name="toolButton_5">
-             <property name="geometry">
-              <rect>
-               <x>140</x>
-               <y>70</y>
-               <width>51</width>
-               <height>21</height>
-              </rect>
-             </property>
-             <property name="text">
-              <string>Remove</string>
-             </property>
-            </widget>
-            <widget class="QToolButton" name="toolButton_6">
-             <property name="geometry">
-              <rect>
-               <x>140</x>
-               <y>40</y>
-               <width>51</width>
-               <height>23</height>
-              </rect>
-             </property>
-             <property name="text">
-              <string>Wand</string>
-             </property>
-             <property name="checkable">
-              <bool>true</bool>
-             </property>
-            </widget>
-            <widget class="QToolButton" name="zoomToggle">
-             <property name="geometry">
-              <rect>
-               <x>80</x>
-               <y>10</y>
-               <width>51</width>
-               <height>23</height>
-              </rect>
-             </property>
-             <property name="text">
-              <string>Zoom</string>
-             </property>
-             <property name="checkable">
-              <bool>true</bool>
-             </property>
-            </widget>
-            <widget class="QToolButton" name="scrollToggle">
-             <property name="geometry">
-              <rect>
-               <x>140</x>
-               <y>10</y>
-               <width>51</width>
-               <height>23</height>
-              </rect>
-             </property>
-             <property name="text">
-              <string>Scroll</string>
-             </property>
-             <property name="checkable">
-              <bool>true</bool>
-             </property>
-            </widget>
-            <widget class="QToolButton" name="pickTool">
-             <property name="geometry">
-              <rect>
-               <x>20</x>
-               <y>40</y>
-               <width>51</width>
-               <height>23</height>
-              </rect>
-             </property>
-             <property name="text">
-              <string>Pick</string>
-             </property>
-             <property name="checkable">
-              <bool>true</bool>
-             </property>
-            </widget>
+            <property name="text">
+             <string>Add Material</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="1">
+           <widget class="QPushButton" name="pushButton_2">
+            <property name="toolTip">
+             <string>Delete the currently selected label from the list. Careful as this might require a re-sorting of label values in the volume.</string>
+            </property>
+            <property name="text">
+             <string>Delete Material</string>
+            </property>
            </widget>
           </item>
          </layout>
         </item>
-        <item row="1" column="0">
+        <item>
+         <widget class="QScrollArea" name="scrollArea">
+          <property name="widgetResizable">
+           <bool>true</bool>
+          </property>
+          <widget class="QWidget" name="scrollAreaWidgetContents">
+           <property name="geometry">
+            <rect>
+             <x>0</x>
+             <y>0</y>
+             <width>280</width>
+             <height>348</height>
+            </rect>
+           </property>
+           <layout class="QGridLayout" name="gridLayout_2">
+            <item row="0" column="0">
+             <widget class="QTreeWidget" name="treeWidget">
+              <property name="styleSheet">
+               <string notr="true"/>
+              </property>
+              <property name="frameShape">
+               <enum>QFrame::NoFrame</enum>
+              </property>
+              <property name="frameShadow">
+               <enum>QFrame::Plain</enum>
+              </property>
+              <property name="lineWidth">
+               <number>0</number>
+              </property>
+              <property name="alternatingRowColors">
+               <bool>true</bool>
+              </property>
+              <property name="sortingEnabled">
+               <bool>true</bool>
+              </property>
+              <property name="animated">
+               <bool>true</bool>
+              </property>
+              <column>
+               <property name="text">
+                <string notr="true">1</string>
+               </property>
+              </column>
+             </widget>
+            </item>
+           </layout>
+          </widget>
+         </widget>
+        </item>
+        <item>
+         <widget class="QFrame" name="frame_4">
+          <property name="minimumSize">
+           <size>
+            <width>0</width>
+            <height>100</height>
+           </size>
+          </property>
+          <property name="frameShape">
+           <enum>QFrame::StyledPanel</enum>
+          </property>
+          <property name="frameShadow">
+           <enum>QFrame::Raised</enum>
+          </property>
+          <widget class="QToolButton" name="toolButton">
+           <property name="geometry">
+            <rect>
+             <x>20</x>
+             <y>10</y>
+             <width>51</width>
+             <height>23</height>
+            </rect>
+           </property>
+           <property name="text">
+            <string>B/C</string>
+           </property>
+           <property name="checkable">
+            <bool>true</bool>
+           </property>
+          </widget>
+          <widget class="QToolButton" name="toolButton_2">
+           <property name="geometry">
+            <rect>
+             <x>80</x>
+             <y>40</y>
+             <width>51</width>
+             <height>23</height>
+            </rect>
+           </property>
+           <property name="text">
+            <string>Brush</string>
+           </property>
+           <property name="checkable">
+            <bool>true</bool>
+           </property>
+          </widget>
+          <widget class="QToolButton" name="toolButton_3">
+           <property name="geometry">
+            <rect>
+             <x>20</x>
+             <y>70</y>
+             <width>51</width>
+             <height>21</height>
+            </rect>
+           </property>
+           <property name="text">
+            <string>Clear</string>
+           </property>
+          </widget>
+          <widget class="QToolButton" name="toolButton_4">
+           <property name="geometry">
+            <rect>
+             <x>80</x>
+             <y>70</y>
+             <width>51</width>
+             <height>21</height>
+            </rect>
+           </property>
+           <property name="text">
+            <string>Add</string>
+           </property>
+          </widget>
+          <widget class="QToolButton" name="toolButton_5">
+           <property name="geometry">
+            <rect>
+             <x>140</x>
+             <y>70</y>
+             <width>51</width>
+             <height>21</height>
+            </rect>
+           </property>
+           <property name="text">
+            <string>Remove</string>
+           </property>
+          </widget>
+          <widget class="QToolButton" name="toolButton_6">
+           <property name="geometry">
+            <rect>
+             <x>140</x>
+             <y>40</y>
+             <width>51</width>
+             <height>23</height>
+            </rect>
+           </property>
+           <property name="text">
+            <string>Wand</string>
+           </property>
+           <property name="checkable">
+            <bool>true</bool>
+           </property>
+          </widget>
+          <widget class="QToolButton" name="zoomToggle">
+           <property name="geometry">
+            <rect>
+             <x>80</x>
+             <y>10</y>
+             <width>51</width>
+             <height>23</height>
+            </rect>
+           </property>
+           <property name="text">
+            <string>Zoom</string>
+           </property>
+           <property name="checkable">
+            <bool>true</bool>
+           </property>
+          </widget>
+          <widget class="QToolButton" name="scrollToggle">
+           <property name="geometry">
+            <rect>
+             <x>140</x>
+             <y>10</y>
+             <width>51</width>
+             <height>23</height>
+            </rect>
+           </property>
+           <property name="toolTip">
+            <string>Scroll through the volume. Use Alt-left-mouse as a shortcut.</string>
+           </property>
+           <property name="text">
+            <string>Scroll</string>
+           </property>
+           <property name="checkable">
+            <bool>true</bool>
+           </property>
+          </widget>
+          <widget class="QToolButton" name="pickTool">
+           <property name="geometry">
+            <rect>
+             <x>20</x>
+             <y>40</y>
+             <width>51</width>
+             <height>23</height>
+            </rect>
+           </property>
+           <property name="text">
+            <string>Pick</string>
+           </property>
+           <property name="checkable">
+            <bool>true</bool>
+           </property>
+          </widget>
+         </widget>
+        </item>
+        <item>
          <widget class="QLabel" name="label">
           <property name="text">
            <string/>
@@ -603,8 +621,10 @@ color: rgb(255, 255, 255);</string>
     </widget>
     <addaction name="actionLoad_Image"/>
     <addaction name="actionLoad_Label"/>
+    <addaction name="actionSave_Label_2"/>
     <addaction name="actionSave_Label"/>
     <addaction name="actionCreate_New_Label"/>
+    <addaction name="actionStatisticsDialog"/>
     <addaction name="actionPreferences"/>
     <addaction name="menuRecent_Files"/>
     <addaction name="menuRecent_Label"/>
@@ -624,9 +644,16 @@ color: rgb(255, 255, 255);</string>
     <addaction name="actionSnapshots"/>
     <addaction name="actionSet_Brightness_Contrast"/>
    </widget>
+   <widget class="QMenu" name="menuHelp">
+    <property name="title">
+     <string>Help</string>
+    </property>
+    <addaction name="actionHow_it_works"/>
+   </widget>
    <addaction name="menuLoad"/>
    <addaction name="menuEdit"/>
    <addaction name="menuAbout"/>
+   <addaction name="menuHelp"/>
   </widget>
   <widget class="QStatusBar" name="statusbar">
    <property name="enabled">
@@ -706,6 +733,21 @@ color: rgb(255, 255, 255);</string>
   <action name="actionSet_Brightness_Contrast">
    <property name="text">
     <string>Set Brightness/Contrast</string>
+   </property>
+  </action>
+  <action name="actionSave_Label_2">
+   <property name="text">
+    <string>Save Label</string>
+   </property>
+  </action>
+  <action name="actionHow_it_works">
+   <property name="text">
+    <string>How it works</string>
+   </property>
+  </action>
+  <action name="actionStatisticsDialog">
+   <property name="text">
+    <string>Statistics</string>
    </property>
   </action>
  </widget>

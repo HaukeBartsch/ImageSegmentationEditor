@@ -1,0 +1,44 @@
+<!DOCTYPE HTML>
+<HTML>
+<HEAD>
+  <TITLE>Help</TITLE>
+</HEAD>
+<BODY>
+<H1>Image Segmentation Editor</H1>
+
+<p>The Image Segmentation Editor allows you to draw on volumetric images. Each region outlined by the user
+can be assigned a label name and a color. A list of these labels is stored in a label file (mgh format)
+and can be loaded at a later time.</p>
+
+<p>Each volume element (voxel) in the label file can have a single label assigned to it. If you need overlapping
+label more than one label file is required.</p>
+
+<H2>Workflow</H2>
+
+<p>Start by loading image data into the Image Segmentation Editor. The editor can read volumes in mgh format and
+volumes that are stored as DICOM (*.dcm). Each loaded volume is represented by an icon on the top of the display.
+Selecting a different icon will switch to the new volume. As a short-cut press the number keys to switch from
+one loaded volume to the next.</p>
+
+<p>Next create a label file (or load one). The label file needs to be stored on your harddrive. Once a label file
+is exists the label list on the left of the interface becomes active. By default each voxel belongs to the material
+"Exterior" which corresponds to the number '0'. Numbers are used to encode the label type in the label file that
+is stored on disk. In order to store the name of a label and its color a second .json file is stored next to the
+.mgh file representing the label.</p>
+
+<p>Segmentation is the process of assigning voxels to labels from the label list. Create the required list of labels
+for your work. For example add a new label "lesion" if you want to assign the voxel of a lesion. Use the Brush tool
+to draw on one of the three images. The voxel will turn red and are stored temporarily in a highlight. Now assign
+these highlighted voxel to your lesion label by selecting the row marked "lesion" and by pressing the "Add" button.
+This will permanently assign the lesion label to the voxel in your highlight. As a result your highlight (red) is
+removed and replaced with voxel that have the color of your label.</p>
+
+<p>Save your label file before you quit the program.</p>
+
+<H2>Keyboard shortcuts</H2>
+
+
+
+
+</BODY>
+</HTML>

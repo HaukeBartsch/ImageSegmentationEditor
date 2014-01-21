@@ -59,6 +59,7 @@ private slots:
 
     void SaveLabel(QString filename);
     void SaveLabelAskForName();
+    void SaveExistingLabel();
     void CreateLabel();
     void autoSave();
 
@@ -85,6 +86,8 @@ private slots:
 
     void about();
 
+    void showHelp();
+
     void createSnapshots();
 
     void on_pushButton_5_clicked();
@@ -107,9 +110,13 @@ private slots:
 
     void showBrightnessContrast();
 
+    void showStatisticsDialog();
+
     void on_scrollToggle_toggled(bool checked);
 
     void on_pickTool_toggled(bool checked);
+
+    void on_pushButton_Show_clicked();
 
 public slots:
     void loadRecentFile( QString fileName );
