@@ -1,3 +1,5 @@
+#include <QFileDialog>
+
 #include "statistics.h"
 #include "ui_statistics.h"
 
@@ -14,61 +16,68 @@ Statistics::~Statistics()
   delete ui;
 }
 
+// compute number of voxel for each material
+std::vector<long> Statistics::computeHistogram() {
+    if (!label)
+      return std::vector<long>(); // nothing to do
+
+    // create an array with volume information for each label
+    std::vector<long> sizes(label->materialNames.size());
+    std::fill(sizes.begin(),sizes.end(),0);
+
+    switch (label->dataType) {
+      case MyPrimType::CHAR :
+      case MyPrimType::UCHAR : {
+          unsigned char *d = label->dataPtr;
+          for (long i = 0; i < (long)label->size[0] * label->size[1] * label->size[2]; i++) {
+            sizes[d[0]]++;
+            d++;
+          }
+          break;
+        }
+      case MyPrimType::SHORT : {
+          short *d = (short *)label->dataPtr;
+          for (long i = 0; i < (long)label->size[0] * label->size[1] * label->size[2]; i++) {
+            sizes[d[0]]++;
+            d++;
+          }
+          break;
+        }
+      case MyPrimType::USHORT : {
+          unsigned short *d = (unsigned short *)label->dataPtr;
+          for (long i = 0; i < (long)label->size[0] * label->size[1] * label->size[2] ; i++) {
+            sizes[d[0]]++;
+            d++;
+          }
+          break;
+        }
+      case MyPrimType::INT : {
+          int *d = (int *)label->dataPtr;
+          for (long i = 0; i < (long)label->size[0] * label->size[1] * label->size[2] ; i++) {
+            sizes[d[0]]++;
+            d++;
+          }
+          break;
+        }
+      case MyPrimType::UINT : {
+          unsigned int *d = (unsigned int *)label->dataPtr;
+          for (long i = 0; i < (long)label->size[0] * label->size[1] * label->size[2]; i++) {
+            sizes[d[0]]++;
+            d++;
+          }
+          break;
+        }
+      case MyPrimType::FLOAT : {
+          fprintf(stderr, "Error: label field should never be a floating point field");
+          break;
+        }
+    }
+    return sizes;
+}
+
+// fill the table with statistics values
 void Statistics::compute() {
-  if (!label)
-    return; // nothing to do
-
-  // create an array with volume information for each label
-  std::vector<long> sizes(label->materialNames.size());
-  std::fill(sizes.begin(),sizes.end(),0);
-
-  switch (label->dataType) {
-    case MyPrimType::CHAR :
-    case MyPrimType::UCHAR : {
-        unsigned char *d = label->dataPtr;
-        for (long i = 0; i < (long)label->size[0] * label->size[1] * label->size[2]; i++) {
-          sizes[d[0]]++;
-          d++;
-        }
-        break;
-      }
-    case MyPrimType::SHORT : {
-        short *d = (short *)label->dataPtr;
-        for (long i = 0; i < (long)label->size[0] * label->size[1] * label->size[2]; i++) {
-          sizes[d[0]]++;
-          d++;
-        }
-        break;
-      }
-    case MyPrimType::USHORT : {
-        unsigned short *d = (unsigned short *)label->dataPtr;
-        for (long i = 0; i < (long)label->size[0] * label->size[1] * label->size[2] ; i++) {
-          sizes[d[0]]++;
-          d++;
-        }
-        break;
-      }
-    case MyPrimType::INT : {
-        int *d = (int *)label->dataPtr;
-        for (long i = 0; i < (long)label->size[0] * label->size[1] * label->size[2] ; i++) {
-          sizes[d[0]]++;
-          d++;
-        }
-        break;
-      }
-    case MyPrimType::UINT : {
-        unsigned int *d = (unsigned int *)label->dataPtr;
-        for (long i = 0; i < (long)label->size[0] * label->size[1] * label->size[2]; i++) {
-          sizes[d[0]]++;
-          d++;
-        }
-        break;
-      }
-    case MyPrimType::FLOAT : {
-        fprintf(stderr, "Error: label field should never be a floating point field");
-        break;
-      }
-  }
+  std::vector<long> sizes = computeHistogram();
 
   QColor titleBackground(Qt::lightGray);
   QFont titleFont = ui->tableWidget->font();
@@ -111,3 +120,62 @@ void Statistics::compute() {
    ui->tableWidget->setItem(sizes.size()+1, 3, new QTableWidgetItem(QString().sprintf("%lf",(double)sum*label->voxelsize[0]*label->voxelsize[1]*label->voxelsize[2])));
    ui->tableWidget->item(sizes.size()+1, 3)->setToolTip("Volume of all non-background label");
 }
+
+void Statistics::on_okButton_clicked()
+{
+    fprintf(stderr, "close dialog");
+    // close the dialog
+    this->hide();
+}
+
+// save the statistics into a file
+void Statistics::on_saveButton_clicked()
+{
+    fprintf(stderr, "save statistics into a file");
+    if (!label)
+        return;
+
+    std::vector<long> sizes = computeHistogram();
+
+    QString filters("CSV files (*.csv);;All files (*.*)");
+    QString defaultFilter("CSV files (*.csv)");
+
+    QString fileName = QFileDialog::getSaveFileName(0, "Save Statistics File",
+                                                    label->filename,
+                                                    filters, &defaultFilter);
+
+    if (fileName.isEmpty())
+      return;
+
+    // SaveLabel(fileName);
+    FILE *fp;
+    if ((fp = fopen(fileName.toLatin1().constData(),"w"))==NULL) {
+        fprintf(stderr, "ERROR: could not open file \"%s\" for writing\n", fileName.toLatin1().constData());
+        return;
+    }
+
+    fprintf(fp, "material name,label value,number of voxel,volume\n");
+    long sum = 0;
+    for (unsigned int i = 0; i < sizes.size(); i++) {
+        if (i > 0)
+          sum += sizes[i];
+        fprintf(fp,"%s,", label->materialNames[i].toLatin1().constData());
+        fprintf(fp, "%d,", i);
+        fprintf(fp, "%ld,",sizes[i]);
+        fprintf(fp, "%f\n",1.0f*sizes[i]*label->voxelsize[0]*label->voxelsize[1]*label->voxelsize[2]);
+    }
+    fprintf(fp, ",,%ld,%lf\n",sum,sum*label->voxelsize[0]*label->voxelsize[1]*label->voxelsize[2]);
+
+    fclose(fp);
+
+    // and close the dialog
+    this->hide();
+}
+
+
+
+
+
+
+
+

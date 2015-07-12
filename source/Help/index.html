@@ -2,13 +2,20 @@
 <HTML>
 <HEAD>
   <TITLE>Help</TITLE>
+  <style>
+  body {
+      font-family: "Arial", Georgia, Serif;
+  }
+  </style>
 </HEAD>
 <BODY>
 <H1>Image Segmentation Editor</H1>
 
-<p>The Image Segmentation Editor allows you to draw on volumetric images. Each region outlined by the user
-can be assigned a label name and a color. A list of these labels is stored in a label file (mgh format)
-and can be loaded at a later time.</p>
+<p>The Image Segmentation Editor allows you to draw on volumetric images loaded as either mgz or DICOM. Be aware that it is a very
+crude tool. Development was stopped after it became tolerably bad judged by people with a high pain threshold. It is modeled after
+the Amira Segmentation Editor (best segmentation tool ever) and can do one thing more (manually segment color images) and everything
+else less. Each region outlined by the user can be assigned a label name and a color. A list of these labels is stored in a label
+file (mgh format with a secondary json file) and can be loaded at a later time.</p>
 
 <p>Each volume element (voxel) in the label file can have a single label assigned to it. If you need overlapping
 label more than one label file is required.</p>
@@ -26,19 +33,84 @@ is exists the label list on the left of the interface becomes active. By default
 is stored on disk. In order to store the name of a label and its color a second .json file is stored next to the
 .mgh file representing the label.</p>
 
-<p>Segmentation is the process of assigning voxels to labels from the label list. Create the required list of labels
-for your work. For example add a new label "lesion" if you want to assign the voxel of a lesion. Use the Brush tool
-to draw on one of the three images. The voxel will turn red and are stored temporarily in a highlight. Now assign
+<p>Segmentation is the process of highlighting voxel and assigning these voxels to labels from the label list. Create the
+required list of labels for your work. For example add a new label "lesion" if you want to assign the voxel of a lesion.
+Use the Brush tool to draw on one of the three images. Use the mouse wheel to switch to neighboring slices. Every voxel you
+paint will turn red and is stored temporarily as a highlight. Now assign
 these highlighted voxel to your lesion label by selecting the row marked "lesion" and by pressing the "Add" button.
 This will permanently assign the lesion label to the voxel in your highlight. As a result your highlight (red) is
-removed and replaced with voxel that have the color of your label.</p>
+removed and replaced with voxel that have the color of your label. In the same manner voxel can be removed from
+existing label ("Remove" button).
+</p>
 
-<p>Save your label file before you quit the program.</p>
+<p>A small list of tools is provided to paint your regions. The Brush tool allows you to draw in a 1-4 radius 2D region. The
+magic wand tool is specific to the location the mouse selects and uses region growing in 2D to select similar voxel close by.</p>
+
+<p>Remember to save your label file before you quit the program.</p>
 
 <H2>Keyboard shortcuts</H2>
 
+<dl>
+<dt>cursor keys</dt><dd>navigate in the current view</dd>
+<dt>TAB</dt><dd>switch slice orientation</dd>
+<dt>0</dt><dd>reset window level</dd>
+<dt>+</dt><dd>add currently highlighted pixel to currently highlighted material</dd>
+<dt>-</dt><dd>remove currently highlighted pixel from currently highlighted material</dd>
+<dt>space bar</dt><dd>toggle visibility of currently highlighted voxel</dd>
+<dt>c</dt><dd>clear currently highlighted voxel</dd>
+<dt>1-9</dt><dd>switch to loaded dataset</dd>
+<dt>Ctrl +1-9</dt><dd>switch to loaded label field</dd>
+<dt>F</dt><dd>fill highlight</dd>
+</dl>
 
+<H2>Mouse commands</H2>
 
+<dl>
+<dt>Double-click</dt><dd>navigate with all 3 orthogonal views to mouse location</dd>
+</dl>
+
+This software is build in C++/Qt using boost and the following C++ library to read in DICOM images:
+
+<pre>
+Imebra 2011 build 2013-07-16_08-42-08
+
+Imebra: a C++ Dicom library
+
+Copyright (c) 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011, 2012, 2013 by Paolo Brandoli/Binarno s.p.
+All rights reserved.
+
+This program is free software; you can redistribute it and/or modify
+ it under the terms of the GNU General Public License version 2 as published by
+ the Free Software Foundation.
+
+This program is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+ along with this program; if not, write to the Free Software
+ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+
+-------------------
+
+If you want to use Imebra commercially then you have to buy the commercial
+ support available at http://imebra.com
+
+After you buy the commercial support then you can use Imebra according
+ to the terms described in the Imebra Commercial License Version 1.
+A copy of the Imebra Commercial License Version 1 is available in the
+ documentation pages.
+
+Imebra is available at http://imebra.com
+
+The author can be contacted by email at info@binarno.com or by mail at
+ the following address:
+ Paolo Brandoli
+ Rakuseva 14
+ 1000 Ljubljana
+ Slovenia
+</pre>
 
 </BODY>
 </HTML>

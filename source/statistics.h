@@ -19,7 +19,14 @@ public:
 
   void setLabel (ScalarVolume *vol) { this->label = vol; }
   void compute();
+  std::vector<long> computeHistogram();
   ScalarVolume *label;
+
+private slots:
+
+  void on_okButton_clicked();
+
+  void on_saveButton_clicked();
 
 private:
   Ui::Statistics *ui;

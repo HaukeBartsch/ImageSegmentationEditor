@@ -3466,7 +3466,7 @@ void MainWindow::about() {
   QMessageBox::about(this, tr("About Image Segmentation Editor"),
                      tr("<p>The <b>Image Segmentation Editor v0.8.7</b> is an application that"
                         " supports image segmentation on multi-modal image data."
-                        "</p><br/>Hauke Bartsch, Dr. rer. nat. 2013"));
+                        "</p><br/>Hauke Bartsch, Dr. rer. nat. 2013-2015"));
 }
 
 // we don't need this for filling the contour, this is only required to compute the
