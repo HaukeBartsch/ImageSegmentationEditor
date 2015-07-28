@@ -509,6 +509,8 @@ void MainWindow::myMousePressEvent ( QObject *object, QMouseEvent * e ) {
   if (object != Image1 && object != Image2 && object != Image3 ) {
     return;
   }
+  bool isAlt   = QApplication::keyboardModifiers() & Qt::AltModifier;
+
   //fprintf(stderr, "Mouse was pressed at: %d %d", e->pos().x(), e->pos().y() );
   mousePressLocation[0] = e->pos().x();
   mousePressLocation[1] = e->pos().y();
@@ -528,18 +530,33 @@ void MainWindow::myMousePressEvent ( QObject *object, QMouseEvent * e ) {
     setHighlightBuffer(object, e);
   }
   if (currentTool == MainWindow::MagicWandTool && object == Image1) {
-    regionGrowing(posx, posy, slicePosition[2]);
-    update();
+    if (isAlt) {
+        regionGrowing3D(posx, posy, slicePosition[2]);
+        update();
+    } else {
+        regionGrowing(posx, posy, slicePosition[2]);
+        update();
+    }
   } else if (currentTool == MainWindow::MagicWandTool && object == Image2) {
     posx = floor( e->pos().x() / scaleFactor23);
     posy = floor( e->pos().y() / scaleFactor23);
-    regionGrowing2(posy, posx, slicePosition[1]);
-    update();
+    if (isAlt) {
+        regionGrowing3D(posx, posy, slicePosition[1]);
+        update();
+    } else {
+        regionGrowing2(posy, posx, slicePosition[1]);
+        update();
+    }
   } else if (currentTool == MainWindow::MagicWandTool && object == Image3) {
     posx = floor( e->pos().x() / scaleFactor23);
     posy = floor( e->pos().y() / scaleFactor23);
-    regionGrowing3(posx, posy, slicePosition[0]);
-    update();
+    if (isAlt) {
+        regionGrowing3D(posx, posy, slicePosition[0]);
+        update();
+    } else {
+        regionGrowing3(posx, posy, slicePosition[0]);
+        update();
+    }
   }
   if (currentTool == MainWindow::PickTool && object == Image1) {
     regionGrowing3DLabel(posx, posy, slicePosition[2]);
@@ -935,26 +952,43 @@ bool MainWindow::mouseEvent(QObject *object, QMouseEvent *e) {
     // add to undo
     //UndoRedo::getInstance().add(&hbuffer);
   } else if (mouseIsDown && currentTool == MainWindow::MagicWandTool) {
+
     // can be several tools create a brush first
     if (lab1 && object == Image1) {
       int posx = floor( e->pos().x() / scaleFactor1);
       int posy = floor( e->pos().y() / scaleFactor1);
 
-      regionGrowing(posx, posy, slicePosition[2]);
-      update();
+      if (isAlt) {
+          fprintf(stderr, "Do 3D region growing instead of only 2d region growing (detected alt in MagicWandTool)\n");
+          regionGrowing3D(posx,posy,slicePosition[2]);
+          update();
+      } else {
+          fprintf(stderr, "Do 2D region growing instead of 3d region growing (detected no alt in MagicWandTool)\n");
+          regionGrowing(posx, posy, slicePosition[2]);
+          update();
+      }
     } else if (lab1 && object == Image2) {
       int posx = floor( e->pos().x() / scaleFactor23);
       int posy = floor( e->pos().y() / scaleFactor23);
 
-      regionGrowing2(posx, posy, slicePosition[1]);
-      update();
-
+      if (isAlt) {
+          regionGrowing3D(posx,posy,slicePosition[1]);
+          update();
+      } else {
+          regionGrowing2(posx, posy, slicePosition[1]);
+          update();
+      }
     } else if (lab1 && object == Image3) {
       int posx = floor( e->pos().x() / scaleFactor23);
       int posy = floor( e->pos().y() / scaleFactor23);
 
-      regionGrowing3(posx, posy, slicePosition[0]);
-      update();
+      if (isAlt) {
+          regionGrowing3D(posx,posy,slicePosition[0]);
+          update();
+      } else {
+          regionGrowing3(posx, posy, slicePosition[0]);
+          update();
+      }
     }
     // add to undo
     //UndoRedo::getInstance().add(&hbuffer);
@@ -1464,6 +1498,622 @@ void MainWindow::regionGrowing3DLabel(int posx, int posy, int slice) {
 }
 
 // add region to buffer
+void MainWindow::regionGrowing3D(int posx, int posy, int posz) {
+  if (!vol1 || posx < 0 || posx > vol1->size[0]-1 ||
+      posy  < 0 || posy  > vol1->size[1]-1 ||
+      posz < 0 || posz > vol1->size[2]-1 ||
+      hbuffer.size() != (size_t)vol1->size[0]*vol1->size[1]*vol1->size[2])
+    return;
+  float fuzzy = 0.2*fabs(windowLevel[1]-windowLevel[0])
+      * 0.2*fabs(windowLevel[1]-windowLevel[0]);
+  bool isCtrl = QApplication::keyboardModifiers() & Qt::ControlModifier;
+
+  // either the current volume is a scalar or a color field
+  if (vol1->elementLength == 1) {
+
+    boost::dynamic_bitset<> done(vol1->size[0]*vol1->size[1]*vol1->size[2]); // what was found
+    std::vector<size_t> todo; // helper array to keep track what needs to be added
+    switch(vol1->dataType) {
+      case MyPrimType::UCHAR : {
+          unsigned char *d = (unsigned char *)vol1->dataPtr; // + offset*vol1->elementLength;
+          size_t idx = (size_t)posz*(vol1->size[0]*vol1->size[1]) + (size_t)posy*vol1->size[0]+posx;
+          float start[1];
+          start[0] = d[idx];
+          done.set(idx);
+          todo.push_back(idx);
+          for (size_t i = 0; i < todo.size(); i++) {
+            size_t here = todo.at(i);
+            int z = floor(here/(vol1->size[0]*vol1->size[1]));
+            int y = floor((here-z*(vol1->size[0]*vol1->size[1]))/vol1->size[0]);
+            int x = (here-z*(vol1->size[0]*vol1->size[1]))-(y*vol1->size[0]);
+
+            size_t n1 = (z)*(vol1->size[0]*vol1->size[1]) + (y+1)*vol1->size[0]+ x;
+            size_t n2 = (z)*(vol1->size[0]*vol1->size[1]) + (y-1)*vol1->size[0]+ x;
+            size_t n3 = (z)*(vol1->size[0]*vol1->size[1]) + (y)  *vol1->size[0]+(x+1);
+            size_t n4 = (z)*(vol1->size[0]*vol1->size[1]) + (y)  *vol1->size[0]+(x-1);
+            size_t n5 = (z-1)*(vol1->size[0]*vol1->size[1]) + (y)  *vol1->size[0]+(x);
+            size_t n6 = (z+1)*(vol1->size[0]*vol1->size[1]) + (y)  *vol1->size[0]+(x);
+            //size_t n4 = (z)*(vol1->size[0]*vol1->size[1]) + (y)  *vol1->size[0]+(x-1);
+            if (y+1 < vol1->size[1] && !done[n1]) {
+              // check intensities at this location relative to first location
+              float h[1];
+              h[0] = d[n1];
+              if ( (start[0]-h[0]) * (start[0] - h[0]) < fuzzy ) {
+                todo.push_back(n1);
+                done.set(n1);
+              }
+            }
+            if (y-1 > -1 && !done[n2]) {
+              // check intensities at this location relative to first location
+              float h[1];
+              h[0] = d[n2];
+              if ( (start[0]-h[0]) * (start[0] - h[0]) < fuzzy ) {
+                todo.push_back(n2);
+                done.set(n2);
+              }
+            }
+            if (x+1 < vol1->size[0] && !done[n3]) {
+              // check intensities at this location relative to first location
+              float h[1];
+              h[0] = d[n3];
+              if ( (start[0]-h[0]) * (start[0] - h[0]) < fuzzy ) {
+                todo.push_back(n3);
+                done.set(n3);
+              }
+            }
+            if (x-1 > -1 && !done[n4]) {
+              // check intensities at this location relative to first location
+              float h[1];
+              h[0] = d[n4];
+              if ( (start[0]-h[0]) * (start[0] - h[0]) < fuzzy ) {
+                todo.push_back(n4);
+                done.set(n4);
+              }
+            }
+            if (z-1 > -1 && !done[n5]) {
+              // check intensities at this location relative to first location
+              float h[1];
+              h[0] = d[n5];
+              if ( (start[0]-h[0]) * (start[0] - h[0]) < fuzzy ) {
+                todo.push_back(n5);
+                done.set(n5);
+              }
+            }
+            if (z+1 < vol1->size[2] && !done[n6]) {
+              // check intensities at this location relative to first location
+              float h[1];
+              h[0] = d[n6];
+              if ( (start[0]-h[0]) * (start[0] - h[0]) < fuzzy ) {
+                todo.push_back(n6);
+                done.set(n6);
+              }
+            }
+          }
+          break;
+        }
+    case MyPrimType::SHORT : {
+        short *d = (short *)vol1->dataPtr; // + offset*vol1->elementLength;
+        size_t idx = (size_t)posz*(vol1->size[0]*vol1->size[1]) + (size_t)posy*vol1->size[0]+posx;
+        float start[1];
+        start[0] = d[idx];
+        done.set(idx);
+        todo.push_back(idx);
+        for (size_t i = 0; i < todo.size(); i++) {
+          size_t here = todo.at(i);
+          int z = floor(here/(vol1->size[0]*vol1->size[1]));
+          int y = floor((here-z*(vol1->size[0]*vol1->size[1]))/vol1->size[0]);
+          int x = (here-z*(vol1->size[0]*vol1->size[1]))-(y*vol1->size[0]);
+
+          size_t n1 = (z)*(vol1->size[0]*vol1->size[1]) + (y+1)*vol1->size[0]+ x;
+          size_t n2 = (z)*(vol1->size[0]*vol1->size[1]) + (y-1)*vol1->size[0]+ x;
+          size_t n3 = (z)*(vol1->size[0]*vol1->size[1]) + (y)  *vol1->size[0]+(x+1);
+          size_t n4 = (z)*(vol1->size[0]*vol1->size[1]) + (y)  *vol1->size[0]+(x-1);
+          size_t n5 = (z-1)*(vol1->size[0]*vol1->size[1]) + (y)  *vol1->size[0]+(x);
+          size_t n6 = (z+1)*(vol1->size[0]*vol1->size[1]) + (y)  *vol1->size[0]+(x);
+          //size_t n4 = (z)*(vol1->size[0]*vol1->size[1]) + (y)  *vol1->size[0]+(x-1);
+          if (y+1 < vol1->size[1] && !done[n1]) {
+            // check intensities at this location relative to first location
+            float h[1];
+            h[0] = d[n1];
+            if ( (start[0]-h[0]) * (start[0] - h[0]) < fuzzy ) {
+              todo.push_back(n1);
+              done.set(n1);
+            }
+          }
+          if (y-1 > -1 && !done[n2]) {
+            // check intensities at this location relative to first location
+            float h[1];
+            h[0] = d[n2];
+            if ( (start[0]-h[0]) * (start[0] - h[0]) < fuzzy ) {
+              todo.push_back(n2);
+              done.set(n2);
+            }
+          }
+          if (x+1 < vol1->size[0] && !done[n3]) {
+            // check intensities at this location relative to first location
+            float h[1];
+            h[0] = d[n3];
+            if ( (start[0]-h[0]) * (start[0] - h[0]) < fuzzy ) {
+              todo.push_back(n3);
+              done.set(n3);
+            }
+          }
+          if (x-1 > -1 && !done[n4]) {
+            // check intensities at this location relative to first location
+            float h[1];
+            h[0] = d[n4];
+            if ( (start[0]-h[0]) * (start[0] - h[0]) < fuzzy ) {
+              todo.push_back(n4);
+              done.set(n4);
+            }
+          }
+          if (z-1 > -1 && !done[n5]) {
+            // check intensities at this location relative to first location
+            float h[1];
+            h[0] = d[n5];
+            if ( (start[0]-h[0]) * (start[0] - h[0]) < fuzzy ) {
+              todo.push_back(n5);
+              done.set(n5);
+            }
+          }
+          if (z+1 < vol1->size[2] && !done[n6]) {
+            // check intensities at this location relative to first location
+            float h[1];
+            h[0] = d[n6];
+            if ( (start[0]-h[0]) * (start[0] - h[0]) < fuzzy ) {
+              todo.push_back(n6);
+              done.set(n6);
+            }
+          }
+        }
+        break;
+      }
+    case MyPrimType::USHORT : {
+        unsigned short *d = (unsigned short *)vol1->dataPtr; // + offset*vol1->elementLength;
+        size_t idx = (size_t)posz*(vol1->size[0]*vol1->size[1]) + (size_t)posy*vol1->size[0]+posx;
+        float start[1];
+        start[0] = d[idx];
+        done.set(idx);
+        todo.push_back(idx);
+        for (size_t i = 0; i < todo.size(); i++) {
+          size_t here = todo.at(i);
+          int z = floor(here/(vol1->size[0]*vol1->size[1]));
+          int y = floor((here-z*(vol1->size[0]*vol1->size[1]))/vol1->size[0]);
+          int x = (here-z*(vol1->size[0]*vol1->size[1]))-(y*vol1->size[0]);
+
+          size_t n1 = (z)*(vol1->size[0]*vol1->size[1]) + (y+1)*vol1->size[0]+ x;
+          size_t n2 = (z)*(vol1->size[0]*vol1->size[1]) + (y-1)*vol1->size[0]+ x;
+          size_t n3 = (z)*(vol1->size[0]*vol1->size[1]) + (y)  *vol1->size[0]+(x+1);
+          size_t n4 = (z)*(vol1->size[0]*vol1->size[1]) + (y)  *vol1->size[0]+(x-1);
+          size_t n5 = (z-1)*(vol1->size[0]*vol1->size[1]) + (y)  *vol1->size[0]+(x);
+          size_t n6 = (z+1)*(vol1->size[0]*vol1->size[1]) + (y)  *vol1->size[0]+(x);
+          //size_t n4 = (z)*(vol1->size[0]*vol1->size[1]) + (y)  *vol1->size[0]+(x-1);
+          if (y+1 < vol1->size[1] && !done[n1]) {
+            // check intensities at this location relative to first location
+            float h[1];
+            h[0] = d[n1];
+            if ( (start[0]-h[0]) * (start[0] - h[0]) < fuzzy ) {
+              todo.push_back(n1);
+              done.set(n1);
+            }
+          }
+          if (y-1 > -1 && !done[n2]) {
+            // check intensities at this location relative to first location
+            float h[1];
+            h[0] = d[n2];
+            if ( (start[0]-h[0]) * (start[0] - h[0]) < fuzzy ) {
+              todo.push_back(n2);
+              done.set(n2);
+            }
+          }
+          if (x+1 < vol1->size[0] && !done[n3]) {
+            // check intensities at this location relative to first location
+            float h[1];
+            h[0] = d[n3];
+            if ( (start[0]-h[0]) * (start[0] - h[0]) < fuzzy ) {
+              todo.push_back(n3);
+              done.set(n3);
+            }
+          }
+          if (x-1 > -1 && !done[n4]) {
+            // check intensities at this location relative to first location
+            float h[1];
+            h[0] = d[n4];
+            if ( (start[0]-h[0]) * (start[0] - h[0]) < fuzzy ) {
+              todo.push_back(n4);
+              done.set(n4);
+            }
+          }
+          if (z-1 > -1 && !done[n5]) {
+            // check intensities at this location relative to first location
+            float h[1];
+            h[0] = d[n5];
+            if ( (start[0]-h[0]) * (start[0] - h[0]) < fuzzy ) {
+              todo.push_back(n5);
+              done.set(n5);
+            }
+          }
+          if (z+1 < vol1->size[2] && !done[n6]) {
+            // check intensities at this location relative to first location
+            float h[1];
+            h[0] = d[n6];
+            if ( (start[0]-h[0]) * (start[0] - h[0]) < fuzzy ) {
+              todo.push_back(n6);
+              done.set(n6);
+            }
+          }
+        }
+        break;
+      }
+    case MyPrimType::FLOAT : {
+        float *d = (float *)vol1->dataPtr; // + offset*vol1->elementLength;
+        size_t idx = (size_t)posz*(vol1->size[0]*vol1->size[1]) + (size_t)posy*vol1->size[0]+posx;
+        float start[1];
+        start[0] = d[idx];
+        done.set(idx);
+        todo.push_back(idx);
+        for (size_t i = 0; i < todo.size(); i++) {
+          size_t here = todo.at(i);
+          int z = floor(here/(vol1->size[0]*vol1->size[1]));
+          int y = floor((here-z*(vol1->size[0]*vol1->size[1]))/vol1->size[0]);
+          int x = (here-z*(vol1->size[0]*vol1->size[1]))-(y*vol1->size[0]);
+
+          size_t n1 = (z)*(vol1->size[0]*vol1->size[1]) + (y+1)*vol1->size[0]+ x;
+          size_t n2 = (z)*(vol1->size[0]*vol1->size[1]) + (y-1)*vol1->size[0]+ x;
+          size_t n3 = (z)*(vol1->size[0]*vol1->size[1]) + (y)  *vol1->size[0]+(x+1);
+          size_t n4 = (z)*(vol1->size[0]*vol1->size[1]) + (y)  *vol1->size[0]+(x-1);
+          size_t n5 = (z-1)*(vol1->size[0]*vol1->size[1]) + (y)  *vol1->size[0]+(x);
+          size_t n6 = (z+1)*(vol1->size[0]*vol1->size[1]) + (y)  *vol1->size[0]+(x);
+          //size_t n4 = (z)*(vol1->size[0]*vol1->size[1]) + (y)  *vol1->size[0]+(x-1);
+          if (y+1 < vol1->size[1] && !done[n1]) {
+            // check intensities at this location relative to first location
+            float h[1];
+            h[0] = d[n1];
+            if ( (start[0]-h[0]) * (start[0] - h[0]) < fuzzy ) {
+              todo.push_back(n1);
+              done.set(n1);
+            }
+          }
+          if (y-1 > -1 && !done[n2]) {
+            // check intensities at this location relative to first location
+            float h[1];
+            h[0] = d[n2];
+            if ( (start[0]-h[0]) * (start[0] - h[0]) < fuzzy ) {
+              todo.push_back(n2);
+              done.set(n2);
+            }
+          }
+          if (x+1 < vol1->size[0] && !done[n3]) {
+            // check intensities at this location relative to first location
+            float h[1];
+            h[0] = d[n3];
+            if ( (start[0]-h[0]) * (start[0] - h[0]) < fuzzy ) {
+              todo.push_back(n3);
+              done.set(n3);
+            }
+          }
+          if (x-1 > -1 && !done[n4]) {
+            // check intensities at this location relative to first location
+            float h[1];
+            h[0] = d[n4];
+            if ( (start[0]-h[0]) * (start[0] - h[0]) < fuzzy ) {
+              todo.push_back(n4);
+              done.set(n4);
+            }
+          }
+          if (z-1 > -1 && !done[n5]) {
+            // check intensities at this location relative to first location
+            float h[1];
+            h[0] = d[n5];
+            if ( (start[0]-h[0]) * (start[0] - h[0]) < fuzzy ) {
+              todo.push_back(n5);
+              done.set(n5);
+            }
+          }
+          if (z+1 < vol1->size[2] && !done[n6]) {
+            // check intensities at this location relative to first location
+            float h[1];
+            h[0] = d[n6];
+            if ( (start[0]-h[0]) * (start[0] - h[0]) < fuzzy ) {
+              todo.push_back(n6);
+              done.set(n6);
+            }
+          }
+        }
+        break;
+      }
+
+    case MyPrimType::INT : {
+        signed int *d = (signed int *)vol1->dataPtr; // + offset*vol1->elementLength;
+        size_t idx = (size_t)posz*(vol1->size[0]*vol1->size[1]) + (size_t)posy*vol1->size[0]+posx;
+        float start[1];
+        start[0] = d[idx];
+        done.set(idx);
+        todo.push_back(idx);
+        for (size_t i = 0; i < todo.size(); i++) {
+          size_t here = todo.at(i);
+          int z = floor(here/(vol1->size[0]*vol1->size[1]));
+          int y = floor((here-z*(vol1->size[0]*vol1->size[1]))/vol1->size[0]);
+          int x = (here-z*(vol1->size[0]*vol1->size[1]))-(y*vol1->size[0]);
+
+          size_t n1 = (z)*(vol1->size[0]*vol1->size[1]) + (y+1)*vol1->size[0]+ x;
+          size_t n2 = (z)*(vol1->size[0]*vol1->size[1]) + (y-1)*vol1->size[0]+ x;
+          size_t n3 = (z)*(vol1->size[0]*vol1->size[1]) + (y)  *vol1->size[0]+(x+1);
+          size_t n4 = (z)*(vol1->size[0]*vol1->size[1]) + (y)  *vol1->size[0]+(x-1);
+          size_t n5 = (z-1)*(vol1->size[0]*vol1->size[1]) + (y)  *vol1->size[0]+(x);
+          size_t n6 = (z+1)*(vol1->size[0]*vol1->size[1]) + (y)  *vol1->size[0]+(x);
+          //size_t n4 = (z)*(vol1->size[0]*vol1->size[1]) + (y)  *vol1->size[0]+(x-1);
+          if (y+1 < vol1->size[1] && !done[n1]) {
+            // check intensities at this location relative to first location
+            float h[1];
+            h[0] = d[n1];
+            if ( (start[0]-h[0]) * (start[0] - h[0]) < fuzzy ) {
+              todo.push_back(n1);
+              done.set(n1);
+            }
+          }
+          if (y-1 > -1 && !done[n2]) {
+            // check intensities at this location relative to first location
+            float h[1];
+            h[0] = d[n2];
+            if ( (start[0]-h[0]) * (start[0] - h[0]) < fuzzy ) {
+              todo.push_back(n2);
+              done.set(n2);
+            }
+          }
+          if (x+1 < vol1->size[0] && !done[n3]) {
+            // check intensities at this location relative to first location
+            float h[1];
+            h[0] = d[n3];
+            if ( (start[0]-h[0]) * (start[0] - h[0]) < fuzzy ) {
+              todo.push_back(n3);
+              done.set(n3);
+            }
+          }
+          if (x-1 > -1 && !done[n4]) {
+            // check intensities at this location relative to first location
+            float h[1];
+            h[0] = d[n4];
+            if ( (start[0]-h[0]) * (start[0] - h[0]) < fuzzy ) {
+              todo.push_back(n4);
+              done.set(n4);
+            }
+          }
+          if (z-1 > -1 && !done[n5]) {
+            // check intensities at this location relative to first location
+            float h[1];
+            h[0] = d[n5];
+            if ( (start[0]-h[0]) * (start[0] - h[0]) < fuzzy ) {
+              todo.push_back(n5);
+              done.set(n5);
+            }
+          }
+          if (z+1 < vol1->size[2] && !done[n6]) {
+            // check intensities at this location relative to first location
+            float h[1];
+            h[0] = d[n6];
+            if ( (start[0]-h[0]) * (start[0] - h[0]) < fuzzy ) {
+              todo.push_back(n6);
+              done.set(n6);
+            }
+          }
+        }
+        break;
+      }
+
+    case MyPrimType::UINT : {
+        unsigned int *d = (unsigned int *)vol1->dataPtr; // + offset*vol1->elementLength;
+        size_t idx = (size_t)posz*(vol1->size[0]*vol1->size[1]) + (size_t)posy*vol1->size[0]+posx;
+        float start[1];
+        start[0] = d[idx];
+        done.set(idx);
+        todo.push_back(idx);
+        for (size_t i = 0; i < todo.size(); i++) {
+          size_t here = todo.at(i);
+          int z = floor(here/(vol1->size[0]*vol1->size[1]));
+          int y = floor((here-z*(vol1->size[0]*vol1->size[1]))/vol1->size[0]);
+          int x = (here-z*(vol1->size[0]*vol1->size[1]))-(y*vol1->size[0]);
+
+          size_t n1 = (z)*(vol1->size[0]*vol1->size[1]) + (y+1)*vol1->size[0]+ x;
+          size_t n2 = (z)*(vol1->size[0]*vol1->size[1]) + (y-1)*vol1->size[0]+ x;
+          size_t n3 = (z)*(vol1->size[0]*vol1->size[1]) + (y)  *vol1->size[0]+(x+1);
+          size_t n4 = (z)*(vol1->size[0]*vol1->size[1]) + (y)  *vol1->size[0]+(x-1);
+          size_t n5 = (z-1)*(vol1->size[0]*vol1->size[1]) + (y)  *vol1->size[0]+(x);
+          size_t n6 = (z+1)*(vol1->size[0]*vol1->size[1]) + (y)  *vol1->size[0]+(x);
+          //size_t n4 = (z)*(vol1->size[0]*vol1->size[1]) + (y)  *vol1->size[0]+(x-1);
+          if (y+1 < vol1->size[1] && !done[n1]) {
+            // check intensities at this location relative to first location
+            float h[1];
+            h[0] = d[n1];
+            if ( (start[0]-h[0]) * (start[0] - h[0]) < fuzzy ) {
+              todo.push_back(n1);
+              done.set(n1);
+            }
+          }
+          if (y-1 > -1 && !done[n2]) {
+            // check intensities at this location relative to first location
+            float h[1];
+            h[0] = d[n2];
+            if ( (start[0]-h[0]) * (start[0] - h[0]) < fuzzy ) {
+              todo.push_back(n2);
+              done.set(n2);
+            }
+          }
+          if (x+1 < vol1->size[0] && !done[n3]) {
+            // check intensities at this location relative to first location
+            float h[1];
+            h[0] = d[n3];
+            if ( (start[0]-h[0]) * (start[0] - h[0]) < fuzzy ) {
+              todo.push_back(n3);
+              done.set(n3);
+            }
+          }
+          if (x-1 > -1 && !done[n4]) {
+            // check intensities at this location relative to first location
+            float h[1];
+            h[0] = d[n4];
+            if ( (start[0]-h[0]) * (start[0] - h[0]) < fuzzy ) {
+              todo.push_back(n4);
+              done.set(n4);
+            }
+          }
+          if (z-1 > -1 && !done[n5]) {
+            // check intensities at this location relative to first location
+            float h[1];
+            h[0] = d[n5];
+            if ( (start[0]-h[0]) * (start[0] - h[0]) < fuzzy ) {
+              todo.push_back(n5);
+              done.set(n5);
+            }
+          }
+          if (z+1 < vol1->size[2] && !done[n6]) {
+            // check intensities at this location relative to first location
+            float h[1];
+            h[0] = d[n6];
+            if ( (start[0]-h[0]) * (start[0] - h[0]) < fuzzy ) {
+              todo.push_back(n6);
+              done.set(n6);
+            }
+          }
+        }
+        break;
+      }
+      default: {
+          fprintf(stderr, "Error: this data type is not supported for this operation");
+        }
+    }
+    // now copy everything in done into the hbuffer
+    for (size_t i = 0; i < done.size(); i++) {
+      if (done[i])
+        hbuffer[i] = !isCtrl;
+    }
+
+  } else if (vol1->elementLength == 4) {
+    boost::dynamic_bitset<> done(vol1->size[0]*vol1->size[1]*vol1->size[2]); // what was found
+    std::vector<size_t> todo; // helper array to keep track what needs to be added
+    switch(vol1->dataType) {
+      case MyPrimType::UCHAR :
+        unsigned char *d = (unsigned char *)vol1->dataPtr; //  + offset*vol1->elementLength;
+        size_t idx = (size_t)posz*(vol1->size[0]*vol1->size[1]) + (size_t)posy*vol1->size[0]+posx;
+        float start[3];
+        start[0] = d[4*idx+0];
+        start[1] = d[4*idx+1];
+        start[2] = d[4*idx+2];
+        done.set(idx);
+        todo.push_back(idx);
+        for (size_t i = 0; i < todo.size(); i++) {
+          size_t here = todo.at(i);
+          int z = floor(here/(vol1->size[0]*vol1->size[1]));
+          int y = floor((here-z*(vol1->size[0]*vol1->size[1]))/vol1->size[0]);
+          int x = (here-z*(vol1->size[0]*vol1->size[1]))-(y*vol1->size[0]);
+
+          //int y = floor(here/vol1->size[0]);
+          //int x = here-(y*vol1->size[0]);
+
+          size_t n1 = (z)*(vol1->size[0]*vol1->size[1]) + (y+1)*vol1->size[0]+ x;
+          size_t n2 = (z)*(vol1->size[0]*vol1->size[1]) + (y-1)*vol1->size[0]+ x;
+          size_t n3 = (z)*(vol1->size[0]*vol1->size[1]) + (y)  *vol1->size[0]+(x+1);
+          size_t n4 = (z)*(vol1->size[0]*vol1->size[1]) + (y)  *vol1->size[0]+(x-1);
+          size_t n5 = (z-1)*(vol1->size[0]*vol1->size[1]) + (y)  *vol1->size[0]+(x);
+          size_t n6 = (z+1)*(vol1->size[0]*vol1->size[1]) + (y)  *vol1->size[0]+(x);
+
+
+          //size_t n1 = (size_t)(y+1)*vol1->size[0]+ x;
+          //size_t n2 = (size_t)(y-1)*vol1->size[0]+ x;
+          //size_t n3 = (size_t)(y)  *vol1->size[0]+(x+1);
+          //size_t n4 = (size_t)(y)  *vol1->size[0]+(x-1);
+          if (y+1 < vol1->size[1] && !done[n1]) {
+            // check intensities at this location relative to first location
+            float h[3];
+            h[0] = d[4*n1+0];
+            h[1] = d[4*n1+1];
+            h[2] = d[4*n1+2];
+            if ( (start[0]-h[0]) * (start[0] - h[0]) +
+                 (start[1]-h[1]) * (start[1] - h[1]) +
+                 (start[2]-h[2]) * (start[2] - h[2]) < fuzzy ) {
+              todo.push_back(n1);
+              done.set(n1);
+            }
+          }
+          if (y-1 > -1 && !done[n2]) {
+            // check intensities at this location relative to first location
+            float h[3];
+            h[0] = d[4*n2+0];
+            h[1] = d[4*n2+1];
+            h[2] = d[4*n2+2];
+            if ( (start[0]-h[0]) * (start[0] - h[0]) +
+                 (start[1]-h[1]) * (start[1] - h[1]) +
+                 (start[2]-h[2]) * (start[2] - h[2]) < fuzzy ) {
+              todo.push_back(n2);
+              done.set(n2);
+            }
+          }
+          if (x+1 < vol1->size[0] && !done[n3]) {
+            // check intensities at this location relative to first location
+            float h[3];
+            h[0] = d[4*n3+0];
+            h[1] = d[4*n3+1];
+            h[2] = d[4*n3+2];
+            if ( (start[0]-h[0]) * (start[0] - h[0]) +
+                 (start[1]-h[1]) * (start[1] - h[1]) +
+                 (start[2]-h[2]) * (start[2] - h[2]) < fuzzy ) {
+              todo.push_back(n3);
+              done.set(n3);
+            }
+          }
+          if (x-1 > -1 && !done[n4]) {
+            // check intensities at this location relative to first location
+            float h[3];
+            h[0] = d[4*n4+0];
+            h[1] = d[4*n4+1];
+            h[2] = d[4*n4+2];
+            if ( (start[0]-h[0]) * (start[0] - h[0]) +
+                 (start[1]-h[1]) * (start[1] - h[1]) +
+                 (start[2]-h[2]) * (start[2] - h[2]) < fuzzy ) {
+              todo.push_back(n4);
+              done.set(n4);
+            }
+          }
+          if (z-1 > -1 && !done[n5]) {
+            // check intensities at this location relative to first location
+            float h[3];
+            h[0] = d[4*n5+0];
+            h[1] = d[4*n5+1];
+            h[2] = d[4*n5+2];
+            if ( (start[0]-h[0]) * (start[0] - h[0]) +
+                 (start[1]-h[1]) * (start[1] - h[1]) +
+                 (start[2]-h[2]) * (start[2] - h[2]) < fuzzy ) {
+              todo.push_back(n5);
+              done.set(n5);
+            }
+          }
+          if (z+1 > vol1->size[2] && !done[n6]) {
+            // check intensities at this location relative to first location
+            float h[3];
+            h[0] = d[4*n6+0];
+            h[1] = d[4*n6+1];
+            h[2] = d[4*n6+2];
+            if ( (start[0]-h[0]) * (start[0] - h[0]) +
+                 (start[1]-h[1]) * (start[1] - h[1]) +
+                 (start[2]-h[2]) * (start[2] - h[2]) < fuzzy ) {
+              todo.push_back(n6);
+              done.set(n6);
+            }
+          }
+        }
+        break;
+    }
+    // now copy everything in done into the hbuffer
+    for (size_t i = 0; i < done.size(); i++) {
+      if (done[i])
+        hbuffer[i] = !isCtrl;
+    }
+  } else {
+    fprintf(stderr, "unknown element length for volume 1");
+  }
+}
+
+// add region to buffer
 void MainWindow::regionGrowing(int posx, int posy, int slice) {
   if (!vol1 || posx < 0 || posx > vol1->size[0]-1 ||
       posy  < 0 || posy  > vol1->size[1]-1 ||
@@ -1907,6 +2557,7 @@ void MainWindow::regionGrowing(int posx, int posy, int slice) {
     fprintf(stderr, "unknown element length for volume 1");
   }
 }
+
 
 // add region to buffer
 void MainWindow::regionGrowing2(int posx, int posy, int slice) {  // slice is in direction y

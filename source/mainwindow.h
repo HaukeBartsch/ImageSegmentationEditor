@@ -202,6 +202,8 @@ private:
     Tools currentTool;
     int BrushToolWidth;
     QDir currentPath;
+    void regionGrowing3D(int posx, int posy, int posz);
+    // region growing for different 2D slices
     void regionGrowing(int posx, int posy, int slice);
     void regionGrowing2(int posx, int posy, int slice);
     void regionGrowing3(int posx, int posy, int slice);
